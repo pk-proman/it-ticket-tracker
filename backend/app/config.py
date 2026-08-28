@@ -1,0 +1,65 @@
+"""
+Central configuration, loaded from environment variables / .env file.
+"""
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# backend/app/config.py -> repo root is two levels up from this file's parent (backend/)
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+REPO_ROOT = BACKEND_DIR.parent
+
+# Load .env from repo root if present, otherwise fall back to defaults silently.
+load_dotenv(REPO_ROOT / ".env")
+
+
+def _int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+PORT = _int("PORT", 8000)
+SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-only-insecure-secret-change-me")
+SESSION_MAX_AGE_HOURS = _int("SESSION_MAX_AGE_HOURS", 12)
+# Mark the session cookie Secure (HTTPS-only). Leave false for local http://
+# development; set SESSION_SECURE_COOKIES=true in production once the app is
+# served over HTTPS (e.g. behind Railway's / your reverse proxy's TLS).
+SESSION_SECURE_COOKIES = os.getenv("SESSION_SECURE_COOKIES", "false").strip().lower() == "true"
+
+DATA_DIR = Path(os.getenv("DATA_DIR", "./data"))
+if not DATA_DIR.is_absolute():
+    DATA_DIR = (REPO_ROOT / DATA_DIR).resolve()
+UPLOADS_DIR = DATA_DIR / "uploads"
+DB_PATH = DATA_DIR / "app.db"
+
+SLA_HOURS = {
+    "Critical": _int("SLA_HOURS_CRITICAL", 4),
+    "High": _int("SLA_HOURS_HIGH", 24),
+    "Medium": _int("SLA_HOURS_MEDIUM", 72),
+    "Low": _int("SLA_HOURS_LOW", 120),
+}
+
+MAX_UPLOAD_MB = _int("MAX_UPLOAD_MB", 15)
+MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
+    ".pdf", ".txt", ".log", ".csv",
+    ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".zip",
+}
+
+SEED_ADMIN_USERNAME = os.getenv("SEED_ADMIN_USERNAME", "admin")
+SEED_ADMIN_PASSWORD = os.getenv("SEED_ADMIN_PASSWORD", "admin123")
+SEED_ADMIN_EMAIL = os.getenv("SEED_ADMIN_EMAIL", "admin@example.com")
+SEED_ADMIN_FULLNAME = os.getenv("SEED_ADMIN_FULLNAME", "IT Administrator")
+
+FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
+
+CATEGORIES = ["Hardware", "Network", "Software/License", "Server/Infra", "Access/Account", "Email", "Other"]
+PRIORITIES = ["Low", "Medium", "High", "Critical"]
+STATUSES = ["Open", "In Progress", "Waiting on User", "Waiting on Vendor", "Resolved", "Closed"]
+OPEN_STATUSES = ["Open", "In Progress", "Waiting on User", "Waiting on Vendor"]

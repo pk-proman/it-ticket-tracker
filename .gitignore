@@ -1,0 +1,26 @@
+# Data (SQLite DB + uploaded attachments) -- back this up, don't commit it
+/data/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node / frontend build
+frontend/node_modules/
+frontend/dist/
+
+# Self-contained local Node.js runtime downloaded by setup (see README)
+.node-runtime/
+
+# Env
+.env
+
+# OS
+.DS_Store
+
+# Unrelated sibling projects that happen to live in this same folder --
+# each has its own repo, never part of this one.
+/profound-erp/
+/proshank-site/
+/tools/
