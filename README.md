@@ -108,7 +108,48 @@ To restore, stop the app, replace `/data` with the backed-up copy, and restart.
 
 ---
 
-## 5. Running as a background service
+## 5. Deploying to Railway (with a custom subdomain)
+
+The repo includes a `Dockerfile` and `railway.toml` so this deploys straight from
+GitHub with no extra setup:
+
+1. **Push this repo to GitHub** (see your own notes / team process, or GitHub's
+   "create a new repository" flow — `git remote add origin <url>` then
+   `git push -u origin main`).
+2. **In Railway:** New Project → Deploy from GitHub repo → select this repo.
+   Railway detects the `Dockerfile` automatically.
+3. **Add a persistent volume** (Railway dashboard → your service → Volumes → New
+   Volume) mounted at **`/data`**. Without this, the SQLite database and
+   uploaded attachments are wiped on every redeploy.
+4. **Set environment variables** (service → Variables): at minimum
+   - `SESSION_SECRET` — a long random string (`openssl rand -hex 32`)
+   - `SESSION_SECURE_COOKIES=true`
+   - `SEED_ADMIN_PASSWORD` — a strong password (only used the very first time
+     the DB is created, i.e. your first deploy)
+   - any `SLA_HOURS_*` overrides you want
+
+   Leave `PORT` alone — Railway injects it automatically and the app already
+   reads it.
+5. **Deploy.** Railway builds the Docker image and gives you a
+   `*.up.railway.app` URL. Confirm it loads and you can log in with `admin` /
+   whatever you set `SEED_ADMIN_PASSWORD` to, then change the password.
+6. **Connect your subdomain:** Railway dashboard → service → Settings →
+   Networking → Custom Domain → enter e.g. `support.yourdomain.com`. Railway
+   shows you a CNAME target (something like `xxxx.up.railway.app`). Go to your
+   domain's DNS provider (Cloudflare, GoDaddy, Namecheap, wherever you manage
+   `yourdomain.com`) and add:
+   ```
+   Type:  CNAME
+   Name:  support            (i.e. the subdomain part only)
+   Value: xxxx.up.railway.app   (whatever Railway showed you)
+   ```
+   DNS propagation is usually minutes, occasionally up to ~24h. Railway
+   auto-issues a free TLS certificate for the subdomain once the CNAME
+   resolves — no certbot/manual TLS needed.
+
+---
+
+## 5b. Running as a background service (self-hosted alternative)
 
 ### Linux (systemd)
 
