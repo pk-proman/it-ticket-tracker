@@ -13,7 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import config
 from .database import init_db
 from .seed import run_seed
-from .routers import auth, users, settings as settings_router, tickets, assets, licenses, kb, notifications, dashboard, reports
+from .routers import auth, users, settings as settings_router, tickets, assets, licenses, kb, notifications, dashboard, reports, sso
 
 app = FastAPI(title="IT Support Ticket Tracker", version="1.0.0")
 
@@ -34,6 +34,7 @@ def on_startup():
 
 # --- API routers -----------------------------------------------------------
 app.include_router(auth.router)
+app.include_router(sso.router)
 app.include_router(users.router)
 app.include_router(settings_router.router)
 app.include_router(tickets.router)

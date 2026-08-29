@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS users (
     is_admin INTEGER NOT NULL DEFAULT 0,
     department TEXT DEFAULT '',
     active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    auth_provider TEXT NOT NULL DEFAULT 'local',
+    sso_subject TEXT
 );
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -164,10 +166,29 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+# Columns added after v1.0.0 that may be missing on an already-deployed
+# database. `CREATE TABLE IF NOT EXISTS` above never alters an existing
+# table, so new columns are added here via a small, idempotent migration
+# instead -- safe to run on every startup, including against a database
+# that already has real production data in it.
+_MIGRATIONS = [
+    ("users", "auth_provider", "TEXT NOT NULL DEFAULT 'local'"),
+    ("users", "sso_subject", "TEXT"),
+]
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    for table, column, coltype in _MIGRATIONS:
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
+
+
 def init_db() -> None:
     conn = get_connection()
     try:
         conn.executescript(SCHEMA)
+        _run_migrations(conn)
         conn.commit()
     finally:
         conn.close()

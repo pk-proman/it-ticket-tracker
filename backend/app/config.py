@@ -59,6 +59,20 @@ SEED_ADMIN_FULLNAME = os.getenv("SEED_ADMIN_FULLNAME", "IT Administrator")
 
 FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 
+# --- Microsoft 365 / Entra ID (Azure AD) single sign-on -------------------
+# Entirely optional -- unset, the app behaves exactly as before (local
+# username/password only). Set all three of MS_CLIENT_ID / MS_CLIENT_SECRET /
+# MS_TENANT_ID to turn on the "Sign in with Microsoft" button. See README for
+# the Azure App Registration steps. Restricted to a single tenant (your own
+# organization's directory) by design -- never the shared "common" endpoint.
+MS_CLIENT_ID = os.getenv("MS_CLIENT_ID", "").strip()
+MS_CLIENT_SECRET = os.getenv("MS_CLIENT_SECRET", "").strip()
+MS_TENANT_ID = os.getenv("MS_TENANT_ID", "").strip()
+# Full callback URL as registered in Azure, e.g. https://support.example.com/api/auth/sso/callback
+MS_REDIRECT_URI = os.getenv("MS_REDIRECT_URI", "").strip()
+
+SSO_ENABLED = bool(MS_CLIENT_ID and MS_CLIENT_SECRET and MS_TENANT_ID and MS_REDIRECT_URI)
+
 CATEGORIES = ["Hardware", "Network", "Software/License", "Server/Infra", "Access/Account", "Email", "Other"]
 PRIORITIES = ["Low", "Medium", "High", "Critical"]
 STATUSES = ["Open", "In Progress", "Waiting on User", "Waiting on Vendor", "Resolved", "Closed"]

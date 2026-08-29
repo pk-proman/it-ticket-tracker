@@ -63,6 +63,7 @@ export default function AdminUsers() {
               <th className="px-3 py-2">Username</th>
               <th className="px-3 py-2">Email</th>
               <th className="px-3 py-2">Role</th>
+              <th className="px-3 py-2">Sign-in</th>
               <th className="px-3 py-2">Admin</th>
               <th className="px-3 py-2">Active</th>
               <th className="px-3 py-2"></th>
@@ -75,6 +76,7 @@ export default function AdminUsers() {
                 <td className="px-3 py-2 text-slate-500">{u.username}</td>
                 <td className="px-3 py-2 text-slate-500">{u.email}</td>
                 <td className="px-3 py-2 capitalize text-slate-500">{u.role}</td>
+                <td className="px-3 py-2 text-slate-500">{u.auth_provider === 'microsoft' ? 'Microsoft' : 'Local'}</td>
                 <td className="px-3 py-2">
                   <button className="text-xs" onClick={() => toggleAdmin(u)}>{u.is_admin ? '✅' : '—'}</button>
                 </td>
