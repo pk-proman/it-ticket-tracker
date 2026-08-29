@@ -207,6 +207,48 @@ sudo systemctl status it-ticket-tracker
 
 ---
 
+## 5c. Microsoft 365 single sign-on (optional)
+
+Runs alongside local username/password login (never replaces it). Unset, the
+app behaves exactly as v1.0.0 did. To turn it on:
+
+1. Go to **[portal.azure.com](https://portal.azure.com) → Microsoft Entra ID →
+   App registrations → New registration**.
+2. **Name:** anything, e.g. "IT Support Ticket Tracker".
+3. **Supported account types:** "Accounts in this organizational directory
+   only (Single tenant)" — important, this restricts sign-in to your own
+   organization only.
+4. **Redirect URI:** platform **Web**, value
+   `https://YOUR-DOMAIN/api/auth/sso/callback` (your Railway `*.up.railway.app`
+   URL or your custom subdomain, whichever you're actually using).
+5. **Register.**
+6. From the **Overview** page, copy the **Application (client) ID** and
+   **Directory (tenant) ID** — these are not secret.
+7. Go to **Certificates & secrets → New client secret**, copy the *value*
+   immediately (shown once, never again) — this one **is** secret.
+8. Go to **API permissions** and click **Grant admin consent for
+   &lt;your org&gt;** (the default `User.Read` / `openid` / `profile` / `email`
+   scopes are enough).
+9. Set these on your deployment (Railway → Variables, or your `.env`):
+   ```
+   MS_CLIENT_ID=<application client id>
+   MS_TENANT_ID=<directory tenant id>
+   MS_REDIRECT_URI=https://YOUR-DOMAIN/api/auth/sso/callback
+   MS_CLIENT_SECRET=<the secret value>   # set this directly in your host's
+                                          # dashboard, never commit it
+   ```
+10. Redeploy. A "Sign in with Microsoft" button appears on the login page
+    automatically once all four variables are set.
+
+**Provisioning behavior:** the first time someone signs in with Microsoft and
+their email doesn't match an existing local account, they're auto-created as
+a **Requester**. Nobody gets Agent or Admin access this way — promote them
+manually under **Users** afterward. If their email *does* match an existing
+local account (e.g. your seeded admin), that account is linked and reused —
+no duplicate is created.
+
+---
+
 ## 6. Resetting an admin password
 
 If you're locked out, reset any user's password from the command line (no need for

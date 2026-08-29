@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.1.0 — Railway deployment + Microsoft 365 SSO
+
+### Added
+- Deployment: multi-stage `Dockerfile`, `railway.toml`, `SESSION_SECURE_COOKIES`
+  config, and uvicorn proxy-header trust — for running behind Railway (or any
+  reverse proxy that terminates TLS) with a custom subdomain.
+- Optional Microsoft 365 / Entra ID single sign-on, alongside (not replacing)
+  local username/password login. Off by default; enabled by setting
+  `MS_CLIENT_ID` / `MS_CLIENT_SECRET` / `MS_TENANT_ID` / `MS_REDIRECT_URI`.
+  First-time SSO sign-ins auto-provision as Requester; existing local accounts
+  are matched and linked by email. See README §5c for the Azure setup steps.
+- Safe, idempotent DB migration path (`auth_provider`, `sso_subject` columns)
+  that runs on every startup without touching existing data.
+
+---
+
 ## v1.0.0 — Initial release
 
 ### Implemented
@@ -59,9 +75,9 @@
   any schema changes.
 - **Multi-tenant / multi-company support.**
 - **Native mobile app** — responsive web only.
-- **External auth (SSO/LDAP).** The auth module (`backend/app/security.py`,
-  `backend/app/deps.py`) is isolated enough to swap for an SSO/LDAP backend
-  later without touching the rest of the app.
+- **LDAP.** Microsoft 365/Entra ID SSO shipped in v1.1.0 (see above); LDAP
+  specifically is still not implemented, though the same auth module
+  (`backend/app/deps.py`, `backend/app/oauth.py`) would isolate it similarly.
 - **Real-time updates** — notifications and lists use polling (30–60s), not
   websockets, by design.
 - **Ticket-to-ticket linking / merging, SLA business-hours calendars** (SLA
