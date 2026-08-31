@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import Modal from '../components/Modal.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const BLANK = { title: '', category: 'Other', body: '', tags: '' }
 
 export default function KnowledgeBase() {
+  const { user } = useAuth()
+  const isAdmin = Boolean(user?.is_admin)
   const [items, setItems] = useState([])
   const [categories, setCategories] = useState([])
   const [q, setQ] = useState('')
@@ -72,7 +75,7 @@ export default function KnowledgeBase() {
               <span>By {a.created_by} · updated {a.updated_at?.slice(0, 10)}</span>
               <div className="flex gap-3">
                 <button className="text-brand-600 hover:underline" onClick={() => setEditing({ ...a })}>Edit</button>
-                <button className="text-red-500 hover:underline" onClick={() => remove(a.id)}>Delete</button>
+                {isAdmin && <button className="text-red-500 hover:underline" onClick={() => remove(a.id)}>Delete</button>}
               </div>
             </div>
           </div>

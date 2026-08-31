@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..database import get_db
-from ..deps import get_current_user, require_agent
+from ..deps import get_current_user, require_agent, require_admin
 from ..utils import rows_to_list
 
 router = APIRouter(prefix="/api/kb", tags=["knowledge base"])
@@ -64,6 +64,6 @@ def update_article(article_id: int, payload: ArticleRequest, conn: sqlite3.Conne
 
 
 @router.delete("/{article_id}")
-def delete_article(article_id: int, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_agent)):
+def delete_article(article_id: int, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_admin)):
     conn.execute("DELETE FROM kb_articles WHERE id = ?", (article_id,))
     return {"ok": True}

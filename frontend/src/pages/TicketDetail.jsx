@@ -11,6 +11,7 @@ export default function TicketDetail() {
   const { id } = useParams()
   const { user } = useAuth()
   const isAgent = user?.role === 'agent'
+  const isAdmin = Boolean(user?.is_admin)
 
   const [ticket, setTicket] = useState(null)
   const [comments, setComments] = useState([])
@@ -233,6 +234,7 @@ export default function TicketDetail() {
             results={licenseResults}
             renderResult={(l) => `${l.software_name} (${l.seats_available} seats free)`}
             onLink={(l) => linkLicense(l.id)}
+            readOnly={!isAdmin}
           />
         </div>
       )}
@@ -307,7 +309,7 @@ function Field({ label, value }) {
   )
 }
 
-function LinkedPanel({ title, items, renderItem, onUnlink, query, onQuery, results, renderResult, onLink }) {
+function LinkedPanel({ title, items, renderItem, onUnlink, query, onQuery, results, renderResult, onLink, readOnly }) {
   return (
     <div className="card p-5">
       <h2 className="mb-3 text-sm font-semibold text-slate-700">{title}</h2>
@@ -315,20 +317,24 @@ function LinkedPanel({ title, items, renderItem, onUnlink, query, onQuery, resul
         {items.map((it) => (
           <li key={it.id} className="flex items-center justify-between">
             <span>{renderItem(it)}</span>
-            <button className="text-xs text-red-500 hover:underline" onClick={() => onUnlink(it)}>Unlink</button>
+            {!readOnly && <button className="text-xs text-red-500 hover:underline" onClick={() => onUnlink(it)}>Unlink</button>}
           </li>
         ))}
         {items.length === 0 && <li className="text-slate-400">None linked.</li>}
       </ul>
-      <input className="input" placeholder="Search to link…" value={query} onChange={(e) => onQuery(e.target.value)} />
-      {results.length > 0 && (
-        <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-md border border-slate-100 p-2 text-sm">
-          {results.map((r) => (
-            <li key={r.id}>
-              <button className="w-full text-left hover:text-brand-700" onClick={() => onLink(r)}>{renderResult(r)}</button>
-            </li>
-          ))}
-        </ul>
+      {!readOnly && (
+        <>
+          <input className="input" placeholder="Search to link…" value={query} onChange={(e) => onQuery(e.target.value)} />
+          {results.length > 0 && (
+            <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-md border border-slate-100 p-2 text-sm">
+              {results.map((r) => (
+                <li key={r.id}>
+                  <button className="w-full text-left hover:text-brand-700" onClick={() => onLink(r)}>{renderResult(r)}</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   )

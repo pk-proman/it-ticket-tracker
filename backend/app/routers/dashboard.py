@@ -5,14 +5,14 @@ from fastapi import APIRouter, Depends
 
 from ..config import OPEN_STATUSES
 from ..database import get_db
-from ..deps import get_current_user
+from ..deps import require_admin
 from ..utils import rows_to_list, serialize_tickets
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 @router.get("")
-def get_dashboard(conn: sqlite3.Connection = Depends(get_db), user=Depends(get_current_user)):
+def get_dashboard(conn: sqlite3.Connection = Depends(get_db), user=Depends(require_admin)):
     open_placeholders = ",".join("?" for _ in OPEN_STATUSES)
 
     by_priority = rows_to_list(conn.execute(

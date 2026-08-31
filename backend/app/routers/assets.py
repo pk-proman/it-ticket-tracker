@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..database import get_db
-from ..deps import get_current_user, require_agent
+from ..deps import get_current_user, require_agent, require_admin
 from ..utils import rows_to_list
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
@@ -28,6 +28,10 @@ class AssetRequest(BaseModel):
 @router.get("")
 def list_assets(q: Optional[str] = None, status: Optional[str] = None, conn: sqlite3.Connection = Depends(get_db), user=Depends(get_current_user)):
     clauses, params = [], []
+    if not user["is_admin"]:
+        # Non-admins (agent or requester) only see assets assigned to them.
+        clauses.append("lower(assigned_to) = lower(?)")
+        params.append(user["full_name"])
     if q:
         clauses.append("(asset_tag LIKE ? OR assigned_to LIKE ? OR location LIKE ? OR type LIKE ?)")
         like = f"%{q}%"
@@ -41,7 +45,7 @@ def list_assets(q: Optional[str] = None, status: Optional[str] = None, conn: sql
 
 
 @router.get("/warranty-expiring")
-def warranty_expiring(days: int = 90, conn: sqlite3.Connection = Depends(get_db), user=Depends(get_current_user)):
+def warranty_expiring(days: int = 90, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_admin)):
     rows = conn.execute(
         """SELECT * FROM assets
            WHERE warranty_expiry IS NOT NULL
@@ -57,6 +61,8 @@ def get_asset(asset_id: int, conn: sqlite3.Connection = Depends(get_db), user=De
     row = conn.execute("SELECT * FROM assets WHERE id = ?", (asset_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Asset not found")
+    if not user["is_admin"] and (row["assigned_to"] or "").lower() != user["full_name"].lower():
+        raise HTTPException(status_code=403, detail="Not authorized to view this asset")
     tickets = conn.execute(
         """SELECT t.id, t.ticket_number, t.title, t.status FROM tickets t
            JOIN ticket_assets ta ON ta.ticket_id = t.id WHERE ta.asset_id = ?""",
@@ -96,6 +102,6 @@ def update_asset(asset_id: int, payload: AssetRequest, conn: sqlite3.Connection 
 
 
 @router.delete("/{asset_id}")
-def delete_asset(asset_id: int, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_agent)):
+def delete_asset(asset_id: int, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_admin)):
     conn.execute("DELETE FROM assets WHERE id = ?", (asset_id,))
     return {"ok": True}

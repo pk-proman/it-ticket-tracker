@@ -12,7 +12,10 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 @router.get("/categories")
-def get_categories(conn: sqlite3.Connection = Depends(get_db)):
+def get_categories(conn: sqlite3.Connection = Depends(get_db), user=Depends(get_current_user)):
+    # Available to any logged-in user (not admin-only) -- everyone needs the
+    # category list to raise a ticket. Managing the list (add/remove, below)
+    # stays admin-only.
     rows = conn.execute("SELECT * FROM categories ORDER BY name").fetchall()
     return rows_to_list(rows)
 
@@ -37,7 +40,7 @@ def delete_category(category_id: int, conn: sqlite3.Connection = Depends(get_db)
 
 
 @router.get("/sla")
-def get_sla(conn: sqlite3.Connection = Depends(get_db)):
+def get_sla(conn: sqlite3.Connection = Depends(get_db), user=Depends(get_current_user)):
     rows = conn.execute("SELECT * FROM sla_rules").fetchall()
     return rows_to_list(rows)
 

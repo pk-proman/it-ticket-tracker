@@ -12,7 +12,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from .. import config
 from ..database import get_db
-from ..deps import get_current_user, require_agent
+from ..deps import get_current_user, require_agent, require_admin
 from ..utils import compute_sla_due, log_audit, next_ticket_number, notify_user, rows_to_list, serialize_ticket_row
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
@@ -70,9 +70,13 @@ class LinkRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _can_view_ticket(user, ticket_row) -> bool:
-    if user["role"] == "agent":
+    """
+    Admins see every ticket. Everyone else (agent or requester, as long as
+    they're not an admin) only sees tickets they raised or are assigned to.
+    """
+    if user["is_admin"]:
         return True
-    return ticket_row["requester_id"] == user["id"]
+    return ticket_row["requester_id"] == user["id"] or ticket_row["assignee_id"] == user["id"]
 
 
 def _ticket_or_404(conn, ticket_id: int):
@@ -94,9 +98,11 @@ def _build_filtered_query(user, status=None, priority=None, category=None, assig
     clauses = []
     params: list = []
 
-    if user["role"] != "agent":
-        clauses.append("requester_id = ?")
-        params.append(user["id"])
+    if not user["is_admin"]:
+        # Non-admins (agent or requester) only ever see tickets they raised or
+        # are assigned to -- admins are the only role with org-wide visibility.
+        clauses.append("(requester_id = ? OR assignee_id = ?)")
+        params.extend([user["id"], user["id"]])
     elif requester_id:
         clauses.append("requester_id = ?")
         params.append(requester_id)
@@ -297,6 +303,9 @@ def update_ticket(ticket_id: int, payload: UpdateTicketRequest, conn: sqlite3.Co
         allowed = set(fields.keys()) <= {"status"} and fields.get("status") == "Closed"
         if not allowed or row["requester_id"] != user["id"] or row["status"] != "Resolved":
             raise HTTPException(status_code=403, detail="Requesters may only close their own resolved tickets")
+    elif not user["is_admin"] and not _can_view_ticket(user, row):
+        # Non-admin agents may only update tickets they raised or are assigned to.
+        raise HTTPException(status_code=403, detail="You can only update tickets you raised or are assigned to")
 
     updates = {}
     if "title" in fields and fields["title"] is not None:
@@ -493,7 +502,9 @@ def download_attachment(ticket_id: int, attachment_id: int, conn: sqlite3.Connec
 
 @router.post("/{ticket_id}/link-asset")
 def link_asset(ticket_id: int, payload: LinkRequest, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_agent)):
-    _ticket_or_404(conn, ticket_id)
+    row = _ticket_or_404(conn, ticket_id)
+    if not _can_view_ticket(user, row):
+        raise HTTPException(status_code=403, detail="Not authorized")
     asset = conn.execute("SELECT id FROM assets WHERE id = ?", (payload.id,)).fetchone()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
@@ -503,12 +514,15 @@ def link_asset(ticket_id: int, payload: LinkRequest, conn: sqlite3.Connection = 
 
 @router.delete("/{ticket_id}/link-asset/{asset_id}")
 def unlink_asset(ticket_id: int, asset_id: int, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_agent)):
+    row = _ticket_or_404(conn, ticket_id)
+    if not _can_view_ticket(user, row):
+        raise HTTPException(status_code=403, detail="Not authorized")
     conn.execute("DELETE FROM ticket_assets WHERE ticket_id = ? AND asset_id = ?", (ticket_id, asset_id))
     return {"ok": True}
 
 
 @router.post("/{ticket_id}/link-license")
-def link_license(ticket_id: int, payload: LinkRequest, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_agent)):
+def link_license(ticket_id: int, payload: LinkRequest, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_admin)):
     _ticket_or_404(conn, ticket_id)
     lic = conn.execute("SELECT id FROM licenses WHERE id = ?", (payload.id,)).fetchone()
     if not lic:
@@ -518,7 +532,7 @@ def link_license(ticket_id: int, payload: LinkRequest, conn: sqlite3.Connection 
 
 
 @router.delete("/{ticket_id}/link-license/{license_id}")
-def unlink_license(ticket_id: int, license_id: int, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_agent)):
+def unlink_license(ticket_id: int, license_id: int, conn: sqlite3.Connection = Depends(get_db), user=Depends(require_admin)):
     conn.execute("DELETE FROM ticket_licenses WHERE ticket_id = ? AND license_id = ?", (ticket_id, license_id))
     return {"ok": True}
 

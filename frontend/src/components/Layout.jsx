@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
 import promanLogo from '../assets/proman-logo.png'
 
-const agentLinks = [
+const adminLinks = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/tickets', label: 'Tickets' },
   { to: '/assets', label: 'Assets' },
@@ -12,12 +12,20 @@ const agentLinks = [
   { to: '/reports', label: 'Reports' },
 ]
 
-const adminLinks = [{ to: '/admin/users', label: 'Users' }, { to: '/admin/settings', label: 'Settings' }]
+const nonAdminAgentLinks = [
+  { to: '/', label: 'My Tickets', end: true },
+  { to: '/tickets', label: 'Ticket Search' },
+  { to: '/assets', label: 'My Assets' },
+  { to: '/kb', label: 'Knowledge Base' },
+]
 
 const requesterLinks = [
   { to: '/', label: 'My Tickets', end: true },
   { to: '/new-ticket', label: 'Raise a Ticket' },
+  { to: '/assets', label: 'My Assets' },
 ]
+
+const adminOnlyLinks = [{ to: '/admin/users', label: 'Users' }, { to: '/admin/settings', label: 'Settings' }]
 
 export default function Layout() {
   const { user, logout } = useAuth()
@@ -25,7 +33,7 @@ export default function Layout() {
 
   if (!user) return null
 
-  const links = user.role === 'agent' ? agentLinks : requesterLinks
+  const links = user.is_admin ? adminLinks : user.role === 'agent' ? nonAdminAgentLinks : requesterLinks
 
   const handleLogout = async () => {
     await logout()
@@ -59,7 +67,7 @@ export default function Layout() {
               <div className="mt-4 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                 Admin
               </div>
-              {adminLinks.map((l) => (
+              {adminOnlyLinks.map((l) => (
                 <NavLink
                   key={l.to}
                   to={l.to}

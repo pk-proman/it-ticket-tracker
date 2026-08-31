@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from ..database import get_db
-from ..deps import require_agent
+from ..deps import require_admin
 from ..utils import rows_to_list
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
@@ -78,7 +78,7 @@ def _build_monthly_report(conn: sqlite3.Connection, year: int, month: int) -> di
 @router.get("/monthly")
 def monthly_report(
     year: int = Query(default=None), month: int = Query(default=None),
-    conn: sqlite3.Connection = Depends(get_db), user=Depends(require_agent),
+    conn: sqlite3.Connection = Depends(get_db), user=Depends(require_admin),
 ):
     now = datetime.now()
     year = year or now.year
@@ -89,7 +89,7 @@ def monthly_report(
 @router.get("/monthly/export.csv")
 def monthly_report_csv(
     year: int = Query(default=None), month: int = Query(default=None),
-    conn: sqlite3.Connection = Depends(get_db), user=Depends(require_agent),
+    conn: sqlite3.Connection = Depends(get_db), user=Depends(require_admin),
 ):
     now = datetime.now()
     year = year or now.year

@@ -55,7 +55,7 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={user?.role === 'agent' ? <Dashboard /> : <MyTickets />} />
+        <Route index element={user?.is_admin ? <Dashboard /> : <MyTickets />} />
         <Route path="new-ticket" element={<NewTicket />} />
         <Route
           path="tickets"
@@ -66,20 +66,15 @@ export default function App() {
           }
         />
         <Route path="tickets/:id" element={<TicketDetail />} />
-        <Route
-          path="assets"
-          element={
-            <RequireAgent>
-              <Assets />
-            </RequireAgent>
-          }
-        />
+        {/* Assets: any authenticated user (admin sees all, everyone else sees
+            only assets assigned to them -- enforced server-side). */}
+        <Route path="assets" element={<Assets />} />
         <Route
           path="licenses"
           element={
-            <RequireAgent>
+            <RequireAdmin>
               <Licenses />
-            </RequireAgent>
+            </RequireAdmin>
           }
         />
         <Route
@@ -93,9 +88,9 @@ export default function App() {
         <Route
           path="reports"
           element={
-            <RequireAgent>
+            <RequireAdmin>
               <Reports />
-            </RequireAgent>
+            </RequireAdmin>
           }
         />
         <Route

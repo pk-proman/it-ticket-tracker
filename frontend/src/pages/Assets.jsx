@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import Modal from '../components/Modal.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const TYPES = ['Laptop', 'Desktop', 'Server', 'Network Device', 'Printer', 'Other']
 const STATUSES = ['In Use', 'Spare', 'Retired']
@@ -8,6 +9,9 @@ const STATUSES = ['In Use', 'Spare', 'Retired']
 const BLANK = { asset_tag: '', type: 'Laptop', assigned_to: '', location: '', purchase_date: '', warranty_expiry: '', status: 'In Use', notes: '' }
 
 export default function Assets() {
+  const { user } = useAuth()
+  const isAdmin = Boolean(user?.is_admin)
+  const canEdit = user?.role === 'agent' // create/edit stays available to any agent, admin or not
   const [items, setItems] = useState([])
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(null) // null = closed, {} = new, {...} = editing
@@ -39,8 +43,8 @@ export default function Assets() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold text-slate-800">Assets</h1>
-        <button className="btn-primary" onClick={() => setEditing({ ...BLANK })}>New Asset</button>
+        <h1 className="text-xl font-semibold text-slate-800">{isAdmin ? 'Assets' : 'My Assets'}</h1>
+        {canEdit && <button className="btn-primary" onClick={() => setEditing({ ...BLANK })}>New Asset</button>}
       </div>
 
       <input className="input max-w-sm" placeholder="Search asset tag, type, location, assignee…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -55,7 +59,7 @@ export default function Assets() {
               <th className="px-3 py-2">Location</th>
               <th className="px-3 py-2">Warranty Expiry</th>
               <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2"></th>
+              {canEdit && <th className="px-3 py-2"></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -67,10 +71,12 @@ export default function Assets() {
                 <td className="px-3 py-2 text-slate-500">{a.location || '—'}</td>
                 <td className="px-3 py-2 text-slate-500">{a.warranty_expiry || '—'}</td>
                 <td className="px-3 py-2"><span className="badge bg-slate-100 text-slate-700">{a.status}</span></td>
-                <td className="px-3 py-2 text-right">
-                  <button className="mr-3 text-xs text-brand-600 hover:underline" onClick={() => setEditing({ ...a })}>Edit</button>
-                  <button className="text-xs text-red-500 hover:underline" onClick={() => remove(a.id)}>Delete</button>
-                </td>
+                {canEdit && (
+                  <td className="px-3 py-2 text-right">
+                    <button className="mr-3 text-xs text-brand-600 hover:underline" onClick={() => setEditing({ ...a })}>Edit</button>
+                    {isAdmin && <button className="text-xs text-red-500 hover:underline" onClick={() => remove(a.id)}>Delete</button>}
+                  </td>
+                )}
               </tr>
             ))}
             {items.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-400">No assets found.</td></tr>}
