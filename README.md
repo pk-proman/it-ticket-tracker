@@ -1,4 +1,4 @@
-# IT Support Ticket Tracker
+# IT Support & Maintenance Tracker
 
 A self-hosted IT support ticket tracking system for internal use at a manufacturing
 company. Runs entirely on `localhost` (or your local network) with no external

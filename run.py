@@ -20,7 +20,7 @@ from app import config
 
 
 def main():
-    print(f"Starting IT Support Ticket Tracker on http://localhost:{config.PORT}")
+    print(f"Starting IT Support & Maintenance Tracker on http://localhost:{config.PORT}")
     print(f"Data directory: {config.DATA_DIR}")
     if not config.FRONTEND_DIST.exists():
         print(

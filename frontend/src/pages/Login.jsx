@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../context/AuthContext.jsx'
+import promanLogo from '../assets/proman-logo.png'
 
 export default function Login() {
   const { login } = useAuth()
@@ -35,10 +36,8 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-brand-600 text-lg font-bold text-white">
-            IT
-          </div>
-          <h1 className="text-lg font-semibold text-slate-800">IT Support Ticket Tracker</h1>
+          <img src={promanLogo} alt="Proman" className="mb-4 h-10 w-auto" />
+          <h1 className="text-lg font-semibold text-slate-800">IT Support &amp; Maintenance Tracker</h1>
           <p className="text-sm text-slate-500">Sign in to continue</p>
         </div>
 

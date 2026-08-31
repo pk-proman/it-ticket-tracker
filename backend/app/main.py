@@ -15,7 +15,7 @@ from .database import init_db
 from .seed import run_seed
 from .routers import auth, users, settings as settings_router, tickets, assets, licenses, kb, notifications, dashboard, reports, sso
 
-app = FastAPI(title="IT Support Ticket Tracker", version="1.0.0")
+app = FastAPI(title="IT Support & Maintenance Tracker", version="1.1.0")
 
 app.add_middleware(
     SessionMiddleware,
