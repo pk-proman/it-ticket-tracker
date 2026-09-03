@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.5.0 — Installable as a PWA
+
+### Added
+- The app is now an installable Progressive Web App: a web manifest (name,
+  Proman-blue theme color, standalone display mode) and a Workbox-generated
+  service worker that precaches the app shell (JS/CSS) for fast/offline-
+  tolerant loading. See README §9 for how end users install it on
+  Android/iOS.
+- New icon set (`frontend/public/`): standard + maskable PWA icons,
+  apple-touch-icon, and a proper favicon (there wasn't one before) — a
+  generated "IT" monogram in the app's existing brand blue, since the actual
+  Proman logo is a wide wordmark that doesn't work as a square icon. Happy
+  to swap in a real Proman icon mark if one exists.
+- `/api/` requests are explicitly excluded from all caching (`NetworkOnly`
+  in the service worker) — ticket/asset/license data always comes from the
+  server live, on every load; only the static UI shell is cached. Reflects a
+  deliberate choice not to show possibly-stale data as if it were current.
+- Backend: serves `.webmanifest` with the correct MIME type explicitly
+  (not guaranteed across platforms otherwise), and serves the service
+  worker/manifest/index.html with `Cache-Control: no-cache` so updates roll
+  out promptly after each deploy instead of users getting stuck on a stale
+  cached version.
+
+---
+
 ## v1.4.0 — Requester ticket editing, real email notifications, reply-by-email
 
 ### Added

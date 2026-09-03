@@ -352,7 +352,35 @@ self-hosted app like this one).
 
 ---
 
-## 9. Project structure
+## 9. Installing on a phone (PWA)
+
+The app is a installable Progressive Web App — no app store, no separate
+build. Once deployed behind HTTPS (Railway gives you this automatically,
+see §5), anyone can add it to their home screen:
+
+**Android (Chrome):** open the app, tap the **⋮** menu → **Install app** (or
+**Add to Home screen**). Some Android/Chrome versions show an automatic
+"Install" banner instead.
+
+**iPhone/iPad (Safari — must be Safari, not Chrome, for this to work):** open
+the app, tap the **Share** icon → **Add to Home Screen**.
+
+Either way, it then launches full-screen from the home screen icon like a
+native app, with the Proman "IT" icon and no browser address bar. It's still
+the same web app underneath — no separate install/update process, everyone
+always gets the current deployed version, and there's nothing to publish to
+an app store.
+
+A note on **offline behavior**: the app shell (the UI itself) is cached for
+fast loading, but ticket/asset/license data is never cached — every screen
+always fetches live from the server. That's deliberate: this app already
+requires the server for real use, so pretending the data works offline would
+just show stale information as if it were current, which is worse than
+clearly needing a connection.
+
+---
+
+## 10. Project structure
 
 ```
 /backend    FastAPI app, SQLite access, business logic, routers

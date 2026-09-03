@@ -3,12 +3,17 @@ FastAPI application entrypoint. Wires up session auth, all API routers,
 and serves the built React frontend as static files so the whole app
 runs behind a single port.
 """
+import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+
+# Not every platform's Python ships this mapping built in -- register it
+# explicitly so the PWA manifest is never served as application/octet-stream.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 from . import config
 from .database import init_db
@@ -69,16 +74,22 @@ if config.FRONTEND_DIST.exists():
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
 
+    # PWA files that must never be served from a stale cache -- the browser
+    # needs to see a fresh sw.js/manifest promptly after every deploy so it
+    # picks up updates instead of running old cached JS indefinitely.
+    _PWA_NO_CACHE = {"sw.js", "registerSW.js", "manifest.webmanifest"}
+
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not found")
         candidate = config.FRONTEND_DIST / full_path
         if full_path and candidate.is_file():
-            return FileResponse(candidate)
+            headers = {"Cache-Control": "no-cache"} if candidate.name in _PWA_NO_CACHE else None
+            return FileResponse(candidate, headers=headers)
         index = config.FRONTEND_DIST / "index.html"
         if index.exists():
-            return FileResponse(index)
+            return FileResponse(index, headers={"Cache-Control": "no-cache"})
         raise HTTPException(status_code=404, detail="Frontend build not found. Run `npm run build` in /frontend.")
 else:
     @app.get("/")
