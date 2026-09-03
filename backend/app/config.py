@@ -73,6 +73,39 @@ MS_REDIRECT_URI = os.getenv("MS_REDIRECT_URI", "").strip()
 
 SSO_ENABLED = bool(MS_CLIENT_ID and MS_CLIENT_SECRET and MS_TENANT_ID and MS_REDIRECT_URI)
 
+# --- Outbound email (SMTP) --------------------------------------------------
+# Entirely optional -- unset, the app behaves exactly as before (in-app
+# notification bell only, nothing sent). Set SMTP_HOST and SMTP_FROM_EMAIL to
+# turn it on. See README for setup notes.
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = _int("SMTP_PORT", 587)
+SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").strip().lower() == "true"  # STARTTLS; ignored on port 465 (implicit SSL)
+SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "").strip()
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "IT Support & Maintenance Tracker").strip()
+EMAIL_ENABLED = bool(SMTP_HOST and SMTP_FROM_EMAIL)
+
+# Public base URL used to build ticket links inside emails. Set this to your
+# real domain/subdomain once deployed -- the localhost default is fine for
+# local dev but wrong for links that end up in someone's inbox.
+APP_BASE_URL = os.getenv("APP_BASE_URL", f"http://localhost:{PORT}").rstrip("/")
+
+# --- Inbound email / reply-by-email (SendGrid Inbound Parse) ---------------
+# Entirely optional -- unset, replying to a notification email just goes
+# nowhere useful (normal email, no special handling). Requires SendGrid's
+# Inbound Parse configured on a subdomain you control (see README): an MX
+# record for that subdomain points at SendGrid, which POSTs each inbound
+# message to INBOUND_WEBHOOK path below.
+#
+# Reply-to addresses look like: ticket-it-0001@<INBOUND_EMAIL_DOMAIN>
+INBOUND_EMAIL_DOMAIN = os.getenv("INBOUND_EMAIL_DOMAIN", "").strip()
+# Secret path segment for the inbound webhook URL -- SendGrid's Inbound Parse
+# doesn't sign its requests, so this acts as a lightweight shared secret.
+# Configure this exact URL in SendGrid: https://<your-app>/api/email/inbound/<this>
+INBOUND_WEBHOOK_TOKEN = os.getenv("INBOUND_WEBHOOK_TOKEN", "").strip()
+REPLY_BY_EMAIL_ENABLED = bool(EMAIL_ENABLED and INBOUND_EMAIL_DOMAIN and INBOUND_WEBHOOK_TOKEN)
+
 CATEGORIES = ["Hardware", "Network", "Software/License", "Server/Infra", "Access/Account", "Email", "Other"]
 PRIORITIES = ["Low", "Medium", "High", "Critical"]
 STATUSES = ["Open", "In Progress", "Waiting on User", "Waiting on Vendor", "Resolved", "Closed"]

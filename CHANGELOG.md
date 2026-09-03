@@ -1,5 +1,44 @@
 # Changelog
 
+## v1.4.0 — Requester ticket editing, real email notifications, reply-by-email
+
+### Added
+- Requesters can now edit their own ticket's title and description at any
+  time before it's Closed (previously they could only close an already-
+  Resolved ticket). Status/priority/category/assignee remain IT-only.
+- Real outbound email (SMTP), off by default — set `SMTP_HOST` +
+  `SMTP_FROM_EMAIL` to turn it on. Fires automatically for: ticket created
+  (confirmation to requester, alert to every agent), status/progress changes,
+  resolution, and new comments. See README §8a.
+- Reply-by-email, off by default — set `INBOUND_EMAIL_DOMAIN` +
+  `INBOUND_WEBHOOK_TOKEN` (needs SendGrid Inbound Parse configured on a
+  subdomain, see README §8b). Replying to any ticket notification email adds
+  the reply as a comment, matched to the sender's account (or the original
+  walk-up requester's email); replying to a Resolved/Closed ticket reopens
+  it. Quoted email history is stripped on a best-effort basis. Unrecognized
+  senders/tickets are silently ignored, not errored, so spoofed mail can't
+  inject comments.
+
+---
+
+## v1.3.0 — Proman branding, title rename, user delete/import, tightened permissions
+
+### Added
+- Proman logo + "IT Support & Maintenance Tracker" branding throughout the UI.
+- Admins can delete individual users or bulk-delete via checkboxes, and
+  bulk-import users from a CSV file (template downloadable from the Users
+  page). A user with existing ticket history can't be deleted (would break
+  the audit trail) — disable their account instead.
+- Permission model reshaped around `is_admin` rather than role alone:
+  non-admins (agent or requester) now only see tickets they raised or are
+  assigned to and assets assigned to them (previously requesters had zero
+  asset visibility at all); Dashboard, Reports, and Licenses are now
+  Admin-only; delete rights (assets, licenses, KB articles, users) are now
+  Admin-only. Non-admins land on a personal "My Tickets" + "My Assets" home
+  page instead of the org-wide Dashboard.
+
+---
+
 ## v1.1.0 — Railway deployment + Microsoft 365 SSO
 
 ### Added
@@ -65,10 +104,8 @@
   created during setup verification) + example asset/license/KB article so
   the UI isn't empty on first run.
 
-### Deferred (explicitly out of scope for v1)
+### Deferred (this section refers to the original v1.0.0 scope; see v1.4.0 above for what has since shipped)
 
-- **Email notifications.** In-app bell only; a single marked extension point
-  (`notify_user()` in `backend/app/utils.py`) is ready for SMTP wiring later.
 - **Rich text / markdown rendering** for descriptions and comments — currently
   plain text (stored and rendered as-is, safely escaped). Markdown syntax
   support could be added to the description/comment renderer later without

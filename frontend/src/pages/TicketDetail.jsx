@@ -31,6 +31,12 @@ export default function TicketDetail() {
   const [licenseQuery, setLicenseQuery] = useState('')
   const [licenseResults, setLicenseResults] = useState([])
 
+  const [editingDetails, setEditingDetails] = useState(false)
+  const [draftTitle, setDraftTitle] = useState('')
+  const [draftDescription, setDraftDescription] = useState('')
+  const [savingDetails, setSavingDetails] = useState(false)
+  const [detailsError, setDetailsError] = useState('')
+
   const load = async () => {
     try {
       const [t, c, a] = await Promise.all([
@@ -62,6 +68,26 @@ export default function TicketDetail() {
     const updated = await api.patch(`/tickets/${id}`, fields)
     setTicket(updated)
     load()
+  }
+
+  const startEditingDetails = () => {
+    setDraftTitle(ticket.title)
+    setDraftDescription(ticket.description || '')
+    setDetailsError('')
+    setEditingDetails(true)
+  }
+
+  const saveDetails = async () => {
+    setSavingDetails(true)
+    setDetailsError('')
+    try {
+      await patch({ title: draftTitle, description: draftDescription })
+      setEditingDetails(false)
+    } catch (err) {
+      setDetailsError(err.message)
+    } finally {
+      setSavingDetails(false)
+    }
   }
 
   const submitComment = async (e) => {
@@ -136,6 +162,7 @@ export default function TicketDetail() {
   if (!ticket) return <div className="text-sm text-slate-400">Loading ticket…</div>
 
   const canClose = !isAgent && ticket.status === 'Resolved' && ticket.requester_id === user.id
+  const canEditDetails = !isAgent && ticket.requester_id === user.id && ticket.status !== 'Closed'
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -145,9 +172,18 @@ export default function TicketDetail() {
 
       <div className="card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-xs font-medium text-slate-400">{ticket.ticket_number}</div>
-            <h1 className="text-lg font-semibold text-slate-800">{ticket.title}</h1>
+            {editingDetails ? (
+              <input
+                className="input mt-1 text-lg font-semibold"
+                value={draftTitle}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                maxLength={300}
+              />
+            ) : (
+              <h1 className="text-lg font-semibold text-slate-800">{ticket.title}</h1>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <PriorityBadge priority={ticket.priority} />
@@ -156,7 +192,30 @@ export default function TicketDetail() {
           </div>
         </div>
 
-        <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{ticket.description || <span className="text-slate-400">No description provided.</span>}</p>
+        {editingDetails ? (
+          <div className="mt-3 space-y-2">
+            {detailsError && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{detailsError}</div>}
+            <textarea
+              className="input"
+              rows={4}
+              value={draftDescription}
+              onChange={(e) => setDraftDescription(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button className="btn-primary" disabled={savingDetails} onClick={saveDetails}>
+                {savingDetails ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn-secondary" onClick={() => setEditingDetails(false)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 flex items-start justify-between gap-3">
+            <p className="whitespace-pre-wrap text-sm text-slate-700">{ticket.description || <span className="text-slate-400">No description provided.</span>}</p>
+            {canEditDetails && (
+              <button className="flex-shrink-0 text-xs text-brand-600 hover:underline" onClick={startEditingDetails}>Edit</button>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-sm md:grid-cols-4">
           <Field label="Requester" value={`${ticket.requester_name}${ticket.requester_department ? ' · ' + ticket.requester_department : ''}`} />

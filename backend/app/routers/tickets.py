@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from .. import config
+from .. import config, mailer
 from ..database import get_db
 from ..deps import get_current_user, require_agent, require_admin
 from ..utils import compute_sla_due, log_audit, next_ticket_number, notify_user, rows_to_list, serialize_ticket_row
@@ -262,6 +262,18 @@ def create_ticket(payload: CreateTicketRequest, conn: sqlite3.Connection = Depen
     for a in agents:
         notify_user(conn, a["id"], "new_ticket", f"New ticket {ticket_number}: {payload.title.strip()}", ticket_id)
 
+    # Confirmation email to the requester -- always has an email on file
+    # (their own account, or whatever an agent typed in for a walk-up), even
+    # when there's no in-app account to put a bell notification on.
+    if config.EMAIL_ENABLED:
+        mailer.send_ticket_created_confirmation(
+            {
+                "ticket_number": ticket_number, "title": payload.title.strip(), "category": payload.category,
+                "priority": payload.priority, "requester_name": requester_name, "requester_email": requester_email,
+            },
+            ticket_id,
+        )
+
     row = _ticket_or_404(conn, ticket_id)
     return _serialize_ticket(row)
 
@@ -299,10 +311,24 @@ def update_ticket(ticket_id: int, payload: UpdateTicketRequest, conn: sqlite3.Co
         return _serialize_ticket(row)
 
     if user["role"] != "agent":
-        # Requesters may only close their own already-resolved ticket -- nothing else.
-        allowed = set(fields.keys()) <= {"status"} and fields.get("status") == "Closed"
-        if not allowed or row["requester_id"] != user["id"] or row["status"] != "Resolved":
-            raise HTTPException(status_code=403, detail="Requesters may only close their own resolved tickets")
+        # Requesters may edit their own ticket's title/description, and close
+        # it once it's Resolved. Status/priority/category/assignee stay IT-only.
+        if row["requester_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="You can only edit your own tickets")
+        field_keys = set(fields.keys())
+        is_close_action = field_keys <= {"status"} and fields.get("status") == "Closed"
+        is_detail_edit = field_keys and field_keys <= {"title", "description"}
+        if is_close_action:
+            if row["status"] != "Resolved":
+                raise HTTPException(status_code=403, detail="You can only close a ticket once it's marked Resolved")
+        elif is_detail_edit:
+            if row["status"] == "Closed":
+                raise HTTPException(status_code=403, detail="This ticket is closed and can no longer be edited")
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only edit your ticket's title and description, or close it once it's resolved",
+            )
     elif not user["is_admin"] and not _can_view_ticket(user, row):
         # Non-admin agents may only update tickets they raised or are assigned to.
         raise HTTPException(status_code=403, detail="You can only update tickets you raised or are assigned to")
@@ -413,28 +439,43 @@ def list_comments(ticket_id: int, conn: sqlite3.Connection = Depends(get_db), us
     return rows_to_list(comments)
 
 
+def add_comment_internal(
+    conn: sqlite3.Connection, row, author_id, author_name: str, body: str,
+    is_internal: bool = False, is_agent_author: bool = False,
+):
+    """
+    Shared comment-creation logic used by both the authenticated API route
+    below and the reply-by-email webhook (routers/email_inbound.py) -- same
+    write, same notification fan-out, regardless of where the comment
+    actually came from.
+    """
+    conn.execute(
+        """INSERT INTO ticket_comments (ticket_id, author_id, author_name, body, is_internal)
+           VALUES (?, ?, ?, ?, ?)""",
+        (row["id"], author_id, author_name, body, int(is_internal)),
+    )
+    conn.execute("UPDATE tickets SET updated_at = datetime('now') WHERE id = ?", (row["id"],))
+
+    notify_targets = set()
+    if not is_internal:
+        if is_agent_author and row["requester_id"]:
+            notify_targets.add(row["requester_id"])
+        elif not is_agent_author and row["assignee_id"]:
+            notify_targets.add(row["assignee_id"])
+    for uid in notify_targets:
+        notify_user(conn, uid, "new_comment", f"New comment on ticket {row['ticket_number']}", row["id"])
+
+
 @router.post("/{ticket_id}/comments")
 def add_comment(ticket_id: int, payload: CommentRequest, conn: sqlite3.Connection = Depends(get_db), user=Depends(get_current_user)):
     row = _ticket_or_404(conn, ticket_id)
     if not _can_view_ticket(user, row):
         raise HTTPException(status_code=403, detail="Not authorized")
     is_internal = payload.is_internal and user["role"] == "agent"  # requesters can never post internal notes
-    conn.execute(
-        """INSERT INTO ticket_comments (ticket_id, author_id, author_name, body, is_internal)
-           VALUES (?, ?, ?, ?, ?)""",
-        (ticket_id, user["id"], user["full_name"], payload.body.strip(), int(is_internal)),
+    add_comment_internal(
+        conn, row, user["id"], user["full_name"], payload.body.strip(),
+        is_internal=is_internal, is_agent_author=user["role"] == "agent",
     )
-    conn.execute("UPDATE tickets SET updated_at = datetime('now') WHERE id = ?", (ticket_id,))
-
-    notify_targets = set()
-    if not is_internal:
-        if user["role"] == "agent" and row["requester_id"]:
-            notify_targets.add(row["requester_id"])
-        elif user["role"] != "agent" and row["assignee_id"]:
-            notify_targets.add(row["assignee_id"])
-    for uid in notify_targets:
-        notify_user(conn, uid, "new_comment", f"New comment on ticket {row['ticket_number']}", ticket_id)
-
     return {"ok": True}
 
 

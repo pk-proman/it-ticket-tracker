@@ -268,7 +268,9 @@ This works for any username, not just `admin`.
   tickets). Agents can additionally be marked **Admin**, which unlocks user
   management, category management, and SLA rule configuration under **Settings**.
 - **Notifications:** the bell icon polls every ~45 seconds for new comments,
-  assignments, and status changes — no email is sent (see below).
+  assignments, and status changes. Real email notifications are also
+  available (see below) — the two aren't exclusive; the bell works regardless
+  of whether email is configured.
 - **SLA:** each priority has a configurable target resolution time (hours), set
   under Settings → SLA Rules. Tickets past their due date and still open show an
   "SLA overdue" badge everywhere in the UI.
@@ -277,13 +279,76 @@ This works for any username, not just `admin`.
 
 ---
 
-## 8. Adding email notifications later (not in v1)
+## 8. Email notifications (optional)
 
-v1 intentionally ships with in-app notifications only, to avoid any external SMTP
-dependency for the initial setup. There's a single, clearly marked extension point
-to wire in email later: `notify_user()` in
-[`backend/app/utils.py`](backend/app/utils.py). See the comment block inside that
-function for exactly what to add.
+Off by default (in-app bell only, nothing external required). Turn on outbound
+email, and optionally reply-by-email, whenever you're ready.
+
+### 8a. Outbound email (SMTP)
+
+Set these on your deployment (Railway → Variables, or your `.env`):
+
+```
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_USERNAME=your-smtp-username
+SMTP_PASSWORD=your-smtp-password        # set this directly in your host's
+                                         # dashboard, never commit it
+SMTP_USE_TLS=true
+SMTP_FROM_EMAIL=support@yourdomain.com
+SMTP_FROM_NAME=IT Support & Maintenance Tracker
+APP_BASE_URL=https://support.yourdomain.com   # used to build ticket links in emails
+```
+
+Any standard SMTP provider works (Gmail SMTP, SendGrid, Mailgun, Postmark,
+Amazon SES, your own mail server). Once `SMTP_HOST` and `SMTP_FROM_EMAIL` are
+both set, emails go out automatically for: ticket created (confirmation to
+the requester, alert to every agent), status/progress changes, resolution,
+and new comments — no other configuration needed, and no code changes if you
+add categories/statuses later.
+
+### 8b. Reply-by-email (optional, needs 8a done first)
+
+Lets someone reply directly to a notification email to add a comment to that
+ticket — no login needed. Requires **SendGrid** for receiving mail (running
+your own mail server to receive email reliably isn't practical for a
+self-hosted app like this one).
+
+1. Pick a subdomain you'll dedicate to this, e.g. `reply.yourdomain.com`.
+2. In SendGrid: **Settings → Inbound Parse → Add Host & URL**.
+   - **Domain:** `reply.yourdomain.com`
+   - **URL:** `https://support.yourdomain.com/api/email/inbound/<a-random-secret-you-pick>`
+     (the random secret in the URL is the only auth SendGrid's Inbound Parse
+     supports — treat it like a password)
+3. At your DNS provider, add an MX record so mail for that subdomain reaches
+   SendGrid:
+   ```
+   Type: MX
+   Name: reply
+   Value: mx.sendgrid.net
+   Priority: 10
+   ```
+4. Set these on your deployment:
+   ```
+   INBOUND_EMAIL_DOMAIN=reply.yourdomain.com
+   INBOUND_WEBHOOK_TOKEN=<the same random secret from the URL above>
+   ```
+5. Redeploy. Every ticket email now has `Reply-To: ticket-it-0001@reply.yourdomain.com`
+   (matching the actual ticket), and replying:
+   - Adds the reply as a comment on that ticket, from whoever sent it (matched
+     by email address — the requester, or an agent/admin's account).
+   - **Reopens the ticket** if the requester replies to a Resolved/Closed one
+     — the resolution email explicitly invites this ("if it's not actually
+     fixed, just reply").
+   - Is silently ignored (not an error, just does nothing) if the sender's
+     email doesn't match anyone associated with the ticket, or the ticket
+     number can't be parsed from the address — this is deliberate, so
+     spoofed/unrelated email can't inject comments.
+
+   Quoted email history ("On ... wrote: > ...") is stripped from replies on a
+   best-effort basis — this covers the common clients (Gmail, Apple Mail,
+   Outlook) but email reply parsing has no fully reliable solution, so an
+   unusual client's reply may occasionally include some extra quoted text.
 
 ---
 
