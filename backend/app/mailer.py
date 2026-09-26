@@ -150,6 +150,11 @@ def _reply_footer(ticket_number: str) -> str:
     return ""
 
 
+# Sign-off appended to every outbound ticket email. Change this one constant
+# to update it everywhere at once.
+_SIGNATURE = "\n\nRegards,\nProman IT / ERP Support"
+
+
 # ---------------------------------------------------------------------------
 # Ticket lifecycle templates
 # ---------------------------------------------------------------------------
@@ -167,6 +172,7 @@ def send_ticket_created_confirmation(ticket: dict, ticket_id: int):
         f"  Priority: {ticket['priority']}\n\n"
         f"Track it here: {ticket_url(ticket_id)}"
         f"{_reply_footer(ticket['ticket_number'])}"
+        f"{_SIGNATURE}"
     )
     send_email(ticket["requester_email"], subject, body, reply_to=reply_to)
 
@@ -179,6 +185,7 @@ def send_new_ticket_alert(agent_email: str, ticket: dict, ticket_id: int):
         f"  Category: {ticket['category']}\n"
         f"  Priority: {ticket['priority']}\n\n"
         f"View it here: {ticket_url(ticket_id)}"
+        f"{_SIGNATURE}"
     )
     send_email(agent_email, subject, body)
 
@@ -200,6 +207,7 @@ def send_ticket_resolved(to_email: str, to_name: str, ticket: dict, ticket_id: i
         f"Ticket {ticket['ticket_number']} ({ticket['title']}) has been marked Resolved.\n\n"
         f"{cta}\n\n"
         f"View it here: {ticket_url(ticket_id)}"
+        f"{_SIGNATURE}"
     )
     send_email(to_email, subject, body, reply_to=reply_to)
 
@@ -213,6 +221,7 @@ def send_ticket_status_changed(to_email: str, to_name: str, ticket: dict, ticket
         f"Ticket {ticket['ticket_number']} ({ticket['title']}) is now: {ticket['status']}.\n\n"
         f"View it here: {ticket_url(ticket_id)}"
         f"{_reply_footer(ticket['ticket_number'])}"
+        f"{_SIGNATURE}"
     )
     send_email(to_email, subject, body, reply_to=reply_to)
 
@@ -227,5 +236,6 @@ def send_new_comment_notification(to_email: str, to_name: str, ticket: dict, tic
         f"  {snippet}\n\n"
         f"View it here: {ticket_url(ticket_id)}"
         f"{_reply_footer(ticket['ticket_number'])}"
+        f"{_SIGNATURE}"
     )
     send_email(to_email, subject, body, reply_to=reply_to)
