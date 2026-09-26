@@ -50,6 +50,16 @@ fi
 NGINX_SITE_FILE="/etc/nginx/sites-available/${DOMAIN}"
 NGINX_SITE_LINK="/etc/nginx/sites-enabled/${DOMAIN}"
 
+# Finds the first free TCP port on localhost, starting from $1 -- used so
+# this app never fights another site/service on the same box over a port.
+find_free_port() {
+  local port=$1
+  while ss -tln 2>/dev/null | grep -q ":${port} "; do
+    port=$((port + 1))
+  done
+  echo "$port"
+}
+
 echo
 echo "=== 1/6: Docker ==="
 if ! command -v docker &>/dev/null; then
@@ -92,7 +102,7 @@ cd "$APP_DIR"
 echo
 echo "=== 4/6: Environment (.env) ==="
 if [[ -f .env ]]; then
-  echo ".env already exists, leaving it untouched."
+  echo ".env already exists, leaving its settings untouched."
 else
   cp .env.example .env
   SESSION_SECRET="$(openssl rand -hex 32)"
@@ -112,6 +122,16 @@ else
   echo "'docker compose up -d --build' again to pick up changes."
 fi
 
+# Pick a free host port -- 8000 is a common default that something else on a
+# shared box may already be using. Runs even against a pre-existing .env
+# from an earlier version of this script that didn't have this line yet.
+if ! grep -q "^APP_HOST_PORT=" .env; then
+  APP_HOST_PORT="$(find_free_port 8000)"
+  echo "APP_HOST_PORT=${APP_HOST_PORT}" >> .env
+  echo "Port 8000 (or higher) check: using ${APP_HOST_PORT} for this app on the host side."
+fi
+APP_HOST_PORT="$(grep "^APP_HOST_PORT=" .env | cut -d= -f2)"
+
 echo
 echo "=== 5/6: Build and start the app ==="
 mkdir -p "$APP_DIR/data"
@@ -124,7 +144,8 @@ if [[ -f "$NGINX_SITE_FILE" ]]; then
   echo "(it may already have TLS added by certbot; re-run certbot manually"
   echo "if you need to)."
 else
-  sed "s/YOUR_DOMAIN/${DOMAIN}/" "$APP_DIR/deploy/nginx-site.conf.template" > "$NGINX_SITE_FILE"
+  sed -e "s/YOUR_DOMAIN/${DOMAIN}/" -e "s/APP_HOST_PORT/${APP_HOST_PORT}/" \
+    "$APP_DIR/deploy/nginx-site.conf.template" > "$NGINX_SITE_FILE"
   ln -sf "$NGINX_SITE_FILE" "$NGINX_SITE_LINK"
   nginx -t
   systemctl reload nginx

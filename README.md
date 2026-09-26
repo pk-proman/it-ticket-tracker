@@ -302,8 +302,11 @@ The script:
 4. Writes a `.env` with a freshly generated `SESSION_SECRET`, prompting you
    once for the initial admin password. Only happens on the very first run —
    review/edit `.env` any time after for SMTP, SSO, SLA hours, etc.
-5. Builds and starts the app container (bound to `127.0.0.1:8000` only —
-   never directly internet-facing; nginx is the only thing that talks to it).
+5. Builds and starts the app container, bound to `127.0.0.1` only — never
+   directly internet-facing; nginx is the only thing that talks to it. Picks
+   the first free port starting from 8000 automatically (a shared box may
+   already have something else on 8000) and records it as `APP_HOST_PORT` in
+   `.env`, so this can't collide with anything else running there.
 6. Adds **one new** nginx site for your domain
    (`/etc/nginx/sites-available/<domain>`, symlinked into `sites-enabled` —
    the same convention your other sites already use) proxying to the app.

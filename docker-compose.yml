@@ -19,6 +19,9 @@ services:
     volumes:
       - ./data:/data
     ports:
-      # Bind only to localhost -- Caddy (or nginx) fronts this with TLS on
-      # 80/443; the app itself is never directly reachable from the internet.
-      - "127.0.0.1:8000:8000"
+      # Bind only to localhost -- nginx fronts this with TLS on 80/443; the
+      # app itself is never directly reachable from the internet. The HOST
+      # side port is configurable (APP_HOST_PORT in .env) since 8000 is a
+      # common default that other things on a shared box may already use --
+      # the container always listens on 8000 internally regardless.
+      - "127.0.0.1:${APP_HOST_PORT:-8000}:8000"
