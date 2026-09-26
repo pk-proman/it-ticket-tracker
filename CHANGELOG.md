@@ -6,15 +6,21 @@
 - `docker-compose.yml` — runs the existing `Dockerfile` (unchanged, still
   used by Railway too) with a persistent `./data` volume and the app bound
   to `127.0.0.1:8000` only, for fronting with a reverse proxy.
-- `deploy/vps-setup.sh` — one-shot, idempotent setup script: installs
-  Docker + Caddy if missing, clones/pulls the repo, generates a fresh `.env`
-  with a random `SESSION_SECRET` on first run (never overwrites an existing
-  one), builds and starts the app, and wires up Caddy for the given domain
-  with fully automatic TLS (no certbot/cron). Re-running the same script is
-  also how you deploy every future update. Doesn't touch any other site's
-  Caddy config already on the same box.
-- `deploy/Caddyfile.template` — the per-site reverse-proxy config the setup
-  script fills in and installs.
+- `deploy/vps-setup.sh` — one-shot, idempotent setup script: installs Docker
+  (via Ubuntu's own `docker.io`/`docker-compose-v2` packages, no extra apt
+  repo added) and certbot if missing, clones/pulls the repo, generates a
+  fresh `.env` with a random `SESSION_SECRET` on first run (never overwrites
+  an existing one), builds and starts the app, and adds **one new** nginx
+  site for the given domain (matching the existing sites-available/
+  sites-enabled convention) with TLS via certbot — auto-detects whether DNS
+  has propagated yet and skips straight to HTTP-only if not, rather than
+  failing. Deliberately does not install or reconfigure nginx itself, and
+  never touches any other site already configured on the box; every reload
+  is preceded by `nginx -t` so a mistake here can't take down anything else
+  running there. Re-running the same script is also how you deploy every
+  future update.
+- `deploy/nginx-site.conf.template` — the per-site reverse-proxy config the
+  setup script fills in and installs.
 - README §5d covers the full walkthrough end to end.
 
 ---

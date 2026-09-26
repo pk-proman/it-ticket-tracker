@@ -1,29 +1,35 @@
 #!/usr/bin/env bash
 # One-shot setup (and re-run-to-update) script for deploying the IT Support &
-# Maintenance Tracker to a plain Ubuntu/Debian VPS (Hostinger's default VPS
-# templates are Ubuntu/Debian-based). See README.md #5d for the full walkthrough.
+# Maintenance Tracker onto a VPS that's already running nginx for other
+# sites (Hostinger or any Ubuntu/Debian box). See README.md #5d.
 #
-# Safe to re-run: it won't touch your .env if one already exists, won't
-# clobber any OTHER site's Caddy config on this box, and re-running after a
-# `git push` is exactly how you deploy an update.
+# Adds ONE new nginx site (sites-available/<domain>, symlinked into
+# sites-enabled -- the same convention your other sites already use) and
+# never touches any existing site's config. Runs `nginx -t` before every
+# reload so a mistake here can't take down anything else on the box.
+#
+# Safe to re-run: won't touch your .env if one already exists, won't
+# clobber the nginx site file if TLS has already been added to it by
+# certbot. Re-running after a `git push` is exactly how you deploy an update.
 #
 # Usage (as root, or with sudo):
-#   ./vps-setup.sh --domain support.yourdomain.com --repo https://github.com/YOU/it-ticket-tracker.git
+#   ./vps-setup.sh --domain itsupport.yourdomain.com --repo https://github.com/YOU/it-ticket-tracker.git
 #
 # Both flags can be omitted and you'll be prompted for them instead.
 
 set -euo pipefail
 
 APP_DIR="/opt/it-ticket-tracker"
-CADDY_SITE_FILE="/etc/caddy/conf.d/it-ticket-tracker.caddy"
 DOMAIN=""
 REPO_URL=""
+CERTBOT_EMAIL=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --domain) DOMAIN="$2"; shift 2 ;;
     --repo) REPO_URL="$2"; shift 2 ;;
     --app-dir) APP_DIR="$2"; shift 2 ;;
+    --email) CERTBOT_EMAIL="$2"; shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
@@ -34,34 +40,33 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 if [[ -z "$DOMAIN" ]]; then
-  read -rp "Domain/subdomain this app will run on (e.g. support.yourdomain.com): " DOMAIN
+  read -rp "Domain/subdomain this app will run on (e.g. itsupport.yourdomain.com): " DOMAIN
 fi
 if [[ -z "$DOMAIN" ]]; then
-  echo "A domain is required (Caddy needs it to issue a TLS certificate)." >&2
+  echo "A domain is required." >&2
   exit 1
 fi
+
+NGINX_SITE_FILE="/etc/nginx/sites-available/${DOMAIN}"
+NGINX_SITE_LINK="/etc/nginx/sites-enabled/${DOMAIN}"
 
 echo
 echo "=== 1/6: Docker ==="
 if ! command -v docker &>/dev/null; then
-  curl -fsSL https://get.docker.com | sh
+  apt-get update -y
+  apt-get install -y docker.io docker-compose-v2
+  systemctl enable --now docker
 else
   echo "Docker already installed, skipping."
 fi
 
 echo
-echo "=== 2/6: Caddy (reverse proxy + automatic HTTPS) ==="
-if ! command -v caddy &>/dev/null; then
+echo "=== 2/6: certbot (for TLS -- nginx itself is already on this box) ==="
+if ! command -v certbot &>/dev/null; then
   apt-get update -y
-  apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-    | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-    | tee /etc/apt/sources.list.d/caddy-stable.list
-  apt-get update -y
-  apt-get install -y caddy
+  apt-get install -y certbot python3-certbot-nginx
 else
-  echo "Caddy already installed, skipping."
+  echo "certbot already installed, skipping."
 fi
 
 echo
@@ -103,9 +108,8 @@ else
     sed -i "s#^SEED_ADMIN_PASSWORD=.*#SEED_ADMIN_PASSWORD=${ADMIN_PW}#" .env
   fi
   echo "Wrote a fresh .env with a random SESSION_SECRET. Review it (SMTP, SSO,"
-  echo "SLA hours, etc. are all optional) at $APP_DIR/.env before going further,"
-  echo "then re-run this script -- or just continue now, you can edit .env and"
-  echo "run 'docker compose up -d --build' again at any time."
+  echo "SLA hours, etc. are all optional) at $APP_DIR/.env any time, then"
+  echo "'docker compose up -d --build' again to pick up changes."
 fi
 
 echo
@@ -114,20 +118,41 @@ mkdir -p "$APP_DIR/data"
 docker compose up -d --build
 
 echo
-echo "=== 6/6: Reverse proxy ==="
-mkdir -p /etc/caddy/conf.d
-if ! grep -q "import /etc/caddy/conf.d/\*.caddy" /etc/caddy/Caddyfile 2>/dev/null; then
-  # Only touch the main Caddyfile if it doesn't already import our directory
-  # -- this box may serve other sites too; never clobber their config.
-  echo "import /etc/caddy/conf.d/*.caddy" >> /etc/caddy/Caddyfile
+echo "=== 6/6: nginx site + TLS ==="
+if [[ -f "$NGINX_SITE_FILE" ]]; then
+  echo "nginx site file for ${DOMAIN} already exists -- leaving it as-is"
+  echo "(it may already have TLS added by certbot; re-run certbot manually"
+  echo "if you need to)."
+else
+  sed "s/YOUR_DOMAIN/${DOMAIN}/" "$APP_DIR/deploy/nginx-site.conf.template" > "$NGINX_SITE_FILE"
+  ln -sf "$NGINX_SITE_FILE" "$NGINX_SITE_LINK"
+  nginx -t
+  systemctl reload nginx
+  echo "HTTP site for ${DOMAIN} is live (once DNS points here)."
+
+  SERVER_IP="$(curl -fsS -4 https://api.ipify.org || true)"
+  RESOLVED_IP="$(getent hosts "$DOMAIN" 2>/dev/null | awk '{print $1}' | head -1 || true)"
+  if [[ -n "$SERVER_IP" && "$RESOLVED_IP" == "$SERVER_IP" ]]; then
+    echo "DNS for ${DOMAIN} already resolves here -- requesting a TLS certificate..."
+    if [[ -z "$CERTBOT_EMAIL" ]]; then
+      CERTBOT_EMAIL="admin@${DOMAIN#*.}"  # guessed -- only used for renewal-expiry notices, pass --email to be exact
+    fi
+    certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$CERTBOT_EMAIL" --redirect \
+      && echo "TLS enabled." \
+      || echo "certbot failed -- once DNS is confirmed pointed here, run: certbot --nginx -d ${DOMAIN}"
+  else
+    echo "DNS for ${DOMAIN} doesn't resolve to this server yet (server is"
+    echo "${SERVER_IP:-unknown}, domain resolves to ${RESOLVED_IP:-nothing}) --"
+    echo "skipping TLS for now. Once your DNS A record is live, run:"
+    echo "  certbot --nginx -d ${DOMAIN}"
+  fi
 fi
-sed "s/YOUR_DOMAIN/${DOMAIN}/" "$APP_DIR/deploy/Caddyfile.template" > "$CADDY_SITE_FILE"
-systemctl reload caddy || systemctl restart caddy
 
 echo
 echo "=================================================================="
-echo "Done. Once DNS for ${DOMAIN} points at this server's IP, it's live at:"
-echo "  https://${DOMAIN}"
+echo "Done. Once DNS for ${DOMAIN} points at this server's IP:"
+echo "  http://${DOMAIN}   (works immediately)"
+echo "  https://${DOMAIN}  (once the certbot step above succeeds)"
 echo
 echo "To deploy an update later: re-run this same script (or just"
 echo "'cd ${APP_DIR} && git pull && docker compose up -d --build')."

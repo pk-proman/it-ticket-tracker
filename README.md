@@ -251,24 +251,27 @@ no duplicate is created.
 
 ## 5d. Deploying to your own VPS (e.g. Hostinger)
 
-This gets you from a fresh VPS to the app running at your own domain over
-HTTPS, using Docker (the same `Dockerfile` Railway builds from) plus
-[Caddy](https://caddyserver.com) as the reverse proxy — Caddy issues and
-renews its own free TLS certificate automatically, no certbot/cron needed.
-(For a bare-metal setup with no Docker at all, see §5b instead — that covers
-running `run.py` as a background service directly, but without the
+This gets you from a VPS to the app running at your own domain over HTTPS,
+using Docker (the same `Dockerfile` Railway builds from) reverse-proxied by
+**nginx** — the same web server most Hostinger VPS boxes already run for
+other sites, so this slots in as one more nginx site rather than introducing
+a second, competing web server. TLS comes from certbot (free, auto-renewing
+Let's Encrypt certificates).
+
+(For a bare-metal setup with no Docker/nginx at all, see §5b instead — that
+covers running `run.py` as a background service directly, but without the
 reverse-proxy/TLS piece this section adds.)
 
 **Prerequisites:**
 - A VPS running Ubuntu or Debian (Hostinger's default templates), with root
   SSH access.
 - A domain or subdomain with its DNS **A record** pointed at the VPS's public
-  IP address (do this first — Caddy can't issue a certificate until it
-  resolves).
-- This repo pushed to GitHub (see the earlier steps in this conversation, or
-  any `git remote add` + `git push`). If the repo is private, either set up a
-  deploy key beforehand or have a GitHub Personal Access Token ready — cloning
-  will prompt for it.
+  IP address. Doesn't have to be done before running the script below (it
+  detects whether DNS has propagated yet and just skips the TLS step if not
+  — see "if DNS isn't live yet" below), but the earlier the better.
+- This repo pushed to GitHub. If the repo is private, either set up a deploy
+  key beforehand or have a GitHub Personal Access Token ready — cloning will
+  prompt for it.
 
 **Steps**, run on the VPS itself (SSH in first — this can't be done from your
 laptop):
@@ -276,33 +279,48 @@ laptop):
 ```bash
 ssh root@your-vps-ip
 
-curl -o vps-setup.sh https://raw.githubusercontent.com/YOUR_USERNAME/it-ticket-tracker/main/deploy/vps-setup.sh
-chmod +x vps-setup.sh
-./vps-setup.sh --domain support.yourdomain.com --repo https://github.com/YOUR_USERNAME/it-ticket-tracker.git
+git clone https://github.com/YOUR_USERNAME/it-ticket-tracker.git /opt/it-ticket-tracker
+cd /opt/it-ticket-tracker
+./deploy/vps-setup.sh --domain itsupport.yourdomain.com
 ```
 
-(If the repo is private, `curl` above can't fetch the raw script — instead
-clone the repo first with your usual git credentials, then run
-`./deploy/vps-setup.sh` from inside it.)
+(Cloning first, rather than `curl`-ing the script directly, works whether the
+repo is public or private, and matches the private-repo case which needs
+your git credentials anyway.)
 
 The script:
-1. Installs Docker, if it isn't already.
-2. Installs Caddy, if it isn't already (won't touch any other sites already
-   configured on the box).
-3. Clones the repo to `/opt/it-ticket-tracker` (or pulls the latest if it's
-   already there — **this is also how you deploy every future update**: just
-   re-run the same script, or `cd /opt/it-ticket-tracker && git pull &&
+1. Installs Docker, if it isn't already (`docker.io` + `docker-compose-v2`
+   from Ubuntu's own package repos — it does **not** add Docker's own apt
+   repo, to keep this as unintrusive as possible on a box already running
+   other production sites).
+2. Installs `certbot` + its nginx plugin, if not already present. Does **not**
+   install or touch nginx itself — it's already there.
+3. Pulls the latest code if `/opt/it-ticket-tracker` already exists, clones it
+   otherwise — **this is also how you deploy every future update**: just
+   re-run the same script (or `cd /opt/it-ticket-tracker && git pull &&
    docker compose up -d --build`).
 4. Writes a `.env` with a freshly generated `SESSION_SECRET`, prompting you
    once for the initial admin password. Only happens on the very first run —
    review/edit `.env` any time after for SMTP, SSO, SLA hours, etc.
 5. Builds and starts the app container (bound to `127.0.0.1:8000` only —
-   never directly internet-facing).
-6. Points Caddy at it for your domain and reloads it.
+   never directly internet-facing; nginx is the only thing that talks to it).
+6. Adds **one new** nginx site for your domain
+   (`/etc/nginx/sites-available/<domain>`, symlinked into `sites-enabled` —
+   the same convention your other sites already use) proxying to the app.
+   Runs `nginx -t` before every reload, so a mistake here can't take down
+   your other sites. Never edits any existing site's config.
+7. If DNS for your domain already resolves to this server, requests a TLS
+   certificate via certbot automatically.
 
-Once DNS has propagated, `https://support.yourdomain.com` is live, with a
-real trusted certificate and no manual TLS setup. Log in as `admin` with the
-password you set, then change it immediately (see §3).
+**If DNS isn't live yet** when you run it: everything above still completes,
+`http://itsupport.yourdomain.com` starts working as soon as DNS propagates,
+and you just run one more command afterward to add HTTPS:
+```bash
+certbot --nginx -d itsupport.yourdomain.com
+```
+
+Log in as `admin` with the password you set, then change it immediately (see
+§3).
 
 **Backups** work exactly as described in §4 — everything is under
 `/opt/it-ticket-tracker/data` on the VPS now instead of a Railway volume.
