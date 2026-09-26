@@ -84,7 +84,23 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").strip().lower() == "true"  # STARTTLS; ignored on port 465 (implicit SSL)
 SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "").strip()
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "IT Support & Maintenance Tracker").strip()
-EMAIL_ENABLED = bool(SMTP_HOST and SMTP_FROM_EMAIL)
+
+# --- Outbound email via Microsoft Graph (alternative to SMTP above) --------
+# Use this instead of SMTP when your tenant has legacy SMTP AUTH disabled
+# tenant-wide (Microsoft's modern default, and many orgs deliberately keep
+# it off) -- sends mail via Microsoft Graph's API using OAuth2 client-
+# credentials, reusing the SAME Azure app registration as SSO above. Needs
+# one additional Graph API Application permission (Mail.Send) added to that
+# app registration, with admin consent granted. See README for the full
+# walkthrough. If both this and SMTP above are configured, Graph takes
+# priority.
+#
+# MS_MAIL_SENDER is the mailbox to send as (e.g. support@yourdomain.com) --
+# must be a real, licensed mailbox in your tenant.
+MS_MAIL_SENDER = os.getenv("MS_MAIL_SENDER", "").strip()
+GRAPH_MAIL_ENABLED = bool(MS_CLIENT_ID and MS_CLIENT_SECRET and MS_TENANT_ID and MS_MAIL_SENDER)
+
+EMAIL_ENABLED = GRAPH_MAIL_ENABLED or bool(SMTP_HOST and SMTP_FROM_EMAIL)
 
 # Public base URL used to build ticket links inside emails. Set this to your
 # real domain/subdomain once deployed -- the localhost default is fine for

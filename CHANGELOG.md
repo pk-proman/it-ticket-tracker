@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.7.0 — Outbound email via Microsoft Graph (alternative to SMTP)
+
+### Added
+- Email can now be sent via **Microsoft Graph** (OAuth2 client-credentials)
+  instead of plain SMTP — for tenants that keep legacy SMTP AUTH disabled
+  tenant-wide (Microsoft's modern default) but still want mail sent from a
+  real M365 mailbox. Reuses the same Azure app registration as SSO; needs one
+  added Graph API Application permission (`Mail.Send`) plus one new env var,
+  `MS_MAIL_SENDER`. Takes priority over SMTP if both are configured. See
+  README §8a-i, including the recommended `ApplicationAccessPolicy` step to
+  scope the permission down from "any mailbox in the tenant" to just the one
+  you actually want to send as.
+- `mailer.py` now has two backends (Graph, SMTP) behind the same
+  `send_email()` call every ticket-lifecycle template already used — no
+  changes needed to any of the calling code, and reply-by-email (§8b) works
+  identically regardless of which backend is active.
+
+---
+
 ## v1.6.0 — Self-hosted VPS deployment (Hostinger or any Ubuntu/Debian box)
 
 ### Added

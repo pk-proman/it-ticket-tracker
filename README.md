@@ -363,11 +363,55 @@ This works for any username, not just `admin`.
 ## 8. Email notifications (optional)
 
 Off by default (in-app bell only, nothing external required). Turn on outbound
-email, and optionally reply-by-email, whenever you're ready.
+email, and optionally reply-by-email, whenever you're ready. Two ways to send
+outbound mail — pick whichever fits your situation (8a-i or 8a-ii), then 8b is
+the same regardless of which you picked.
 
-### 8a. Outbound email (SMTP)
+### 8a-i. Outbound email via Microsoft Graph (use this if your M365 tenant has SMTP AUTH disabled)
 
-Set these on your deployment (Railway → Variables, or your `.env`):
+Many M365 tenants disable legacy SMTP AUTH tenant-wide by default (or
+deliberately, as a security policy) — if that's you, plain SMTP against
+`smtp.office365.com` will fail with `535 5.7.139 ... disabled for the
+Tenant`, and re-enabling that tenant-wide is a real security trade-off you
+may not want to make just for this app. Graph-based sending avoids the
+question entirely: it uses OAuth2 client-credentials (the same mechanism
+Power Automate and most modern M365 integrations use), not legacy SMTP AUTH,
+so it's unaffected by that tenant setting either way.
+
+1. Reuse the **same Azure app registration** you already created for SSO
+   (§5c) — no need for a second one.
+2. In that app registration: **API permissions → Add a permission →
+   Microsoft Graph → Application permissions** → search for and add
+   **`Mail.Send`**.
+3. Click **Grant admin consent for &lt;your org&gt;** — this permission needs
+   admin consent, and by default it lets the app send as *any* mailbox in
+   your tenant, so it's worth locking down (next step).
+4. **Recommended:** restrict which mailbox(es) this app can actually send as,
+   via an Exchange Online `ApplicationAccessPolicy` (needs Exchange Online
+   PowerShell — this one **is** just a scoping/allow-list step, not the
+   tenant-wide SMTP AUTH toggle):
+   ```powershell
+   New-DistributionGroup -Name "GraphMailSenders" -Members support@yourdomain.com
+   New-ApplicationAccessPolicy -AppId <MS_CLIENT_ID> -PolicyScopeGroupId "GraphMailSenders" -AccessRight RestrictAccess -Description "IT Ticket Tracker - mail send only"
+   ```
+   Without this, the permission works fine but is broader than it needs to
+   be — skip it if you're comfortable with that for now, it's not required
+   for functionality.
+5. Set these on your deployment (`.env` or Railway → Variables) — no new
+   client ID/secret needed, just one more variable alongside the SSO ones:
+   ```
+   MS_CLIENT_ID=<same value as SSO>
+   MS_CLIENT_SECRET=<same value as SSO>
+   MS_TENANT_ID=<same value as SSO>
+   MS_MAIL_SENDER=support@yourdomain.com   # must be a real, licensed mailbox
+   APP_BASE_URL=https://support.yourdomain.com
+   ```
+6. Restart to apply: `docker compose up -d --force-recreate` (VPS) or
+   redeploy (Railway).
+
+### 8a-ii. Outbound email via plain SMTP (any provider)
+
+Set these instead of the Graph variables above:
 
 ```
 SMTP_HOST=smtp.yourprovider.com
@@ -382,11 +426,16 @@ APP_BASE_URL=https://support.yourdomain.com   # used to build ticket links in em
 ```
 
 Any standard SMTP provider works (Gmail SMTP, SendGrid, Mailgun, Postmark,
-Amazon SES, your own mail server). Once `SMTP_HOST` and `SMTP_FROM_EMAIL` are
-both set, emails go out automatically for: ticket created (confirmation to
-the requester, alert to every agent), status/progress changes, resolution,
-and new comments — no other configuration needed, and no code changes if you
-add categories/statuses later.
+Amazon SES, your own mail server, or an M365 mailbox if its tenant *does*
+allow legacy SMTP AUTH). If both this and the Graph variables above are set,
+Graph takes priority.
+
+---
+
+Either way, once configured, emails go out automatically for: ticket created
+(confirmation to the requester, alert to every agent), status/progress
+changes, resolution, and new comments — no other configuration needed, and
+no code changes if you add categories/statuses later.
 
 ### 8b. Reply-by-email (optional, needs 8a done first)
 
