@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
-import promanLogo from '../assets/proman-logo.png'
+import promanMark from '../assets/proman-mark-square.png'
 
 const adminLinks = [
   { to: '/', label: 'Dashboard', end: true },
@@ -43,9 +43,9 @@ export default function Layout() {
   return (
     <div className="flex h-screen overflow-hidden">
       <aside className="hidden w-56 flex-shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex flex-col gap-1 border-b border-slate-100 px-4 py-3">
-          <img src={promanLogo} alt="Proman" className="h-7 w-auto" />
-          <span className="text-[11px] font-semibold leading-tight text-slate-500">IT Support &amp; Maintenance Tracker</span>
+        <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
+          <img src={promanMark} alt="Proman" className="h-9 w-9 flex-shrink-0" />
+          <span className="text-xs font-semibold leading-tight text-slate-600">IT Support &amp; Maintenance Tracker</span>
         </div>
         <nav className="flex-1 space-y-0.5 px-2 py-3">
           {links.map((l) => (
