@@ -20,10 +20,10 @@ from .database import init_db
 from .seed import run_seed
 from .routers import (
     auth, users, settings as settings_router, tickets, assets, licenses, kb,
-    notifications, dashboard, reports, sso, email_inbound,
+    notifications, dashboard, reports, sso, email_inbound, approvals,
 )
 
-app = FastAPI(title="IT Support & Maintenance Tracker", version="1.2.0")
+app = FastAPI(title="IT Support & Maintenance Tracker", version="1.3.0")
 
 app.add_middleware(
     SessionMiddleware,
@@ -52,6 +52,7 @@ app.include_router(kb.router)
 app.include_router(notifications.router)
 app.include_router(dashboard.router)
 app.include_router(email_inbound.router)
+app.include_router(approvals.router)
 app.include_router(reports.router)
 
 

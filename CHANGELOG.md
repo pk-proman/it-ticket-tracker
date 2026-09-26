@@ -1,5 +1,41 @@
 # Changelog
 
+## v1.8.0 — Category-based routing, approval workflow, simplified user creation
+
+### Added
+- Each category (Settings → admin) can now configure a **default assignee**
+  (auto-assigned the moment a matching ticket is raised) and/or **requires
+  approval** with a designated **approver** — the ticket stays unassigned
+  and an approval request emails the approver instead of assigning it
+  directly. See README §8c.
+- New token-secured (not login-secured) approval flow: the approver clicks a
+  link straight from the email, no account needed. Deliberately GET-shows-a-
+  confirmation-page then POST-to-decide, rather than a one-click GET link —
+  corporate mail systems that pre-fetch links to scan them for malware would
+  otherwise silently approve things before a human saw the message. Approve
+  assigns the ticket and notifies the requester; reject leaves it unassigned
+  and notifies the requester it wasn't approved. Links are single-use.
+- Ticket detail page shows an "Awaiting approval from X" banner while a
+  decision is pending, visible to anyone who can view that ticket.
+- New Users form: a single "User Type" selector (Admin / Agent / Requester)
+  replaces the separate Role dropdown + "Grant admin" checkbox — same two
+  underlying fields, just presented as the one choice it actually is instead
+  of two independently-toggleable controls.
+- New `ticket_approvals` table and `categories.default_assignee_id` /
+  `requires_approval` / `approver_id` columns, added via the existing safe
+  additive-migration mechanism (no impact to already-deployed databases).
+
+Verified end-to-end locally: category config saves and loads correctly:
+approval-required tickets stay unassigned with a pending-approval row
+created; non-approval categories auto-assign at creation; the confirmation
+page renders correctly and a bare GET does *not* approve anything (prefetch-
+safety, checked explicitly); POST-approve assigns the ticket, logs it to the
+audit trail, and revisiting the same link afterward correctly shows
+"already decided" instead of re-triggering; POST-reject leaves the ticket
+unassigned; an unknown token 404s.
+
+---
+
 ## v1.7.0 — Outbound email via Microsoft Graph (alternative to SMTP)
 
 ### Added

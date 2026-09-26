@@ -27,8 +27,27 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL
+    name TEXT UNIQUE NOT NULL,
+    default_assignee_id INTEGER REFERENCES users(id),
+    requires_approval INTEGER NOT NULL DEFAULT 0,
+    approver_id INTEGER REFERENCES users(id)
 );
+
+-- One row per ticket that needed approval before assignment (see the
+-- category's requires_approval/approver_id above). Token-secured, not
+-- login-secured -- the approver clicks a link straight from an email.
+CREATE TABLE IF NOT EXISTS ticket_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    approver_id INTEGER NOT NULL REFERENCES users(id),
+    default_assignee_id INTEGER REFERENCES users(id),
+    token TEXT UNIQUE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    decided_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_approvals_ticket ON ticket_approvals(ticket_id);
 
 CREATE TABLE IF NOT EXISTS sla_rules (
     priority TEXT PRIMARY KEY,
@@ -174,6 +193,9 @@ def get_connection() -> sqlite3.Connection:
 _MIGRATIONS = [
     ("users", "auth_provider", "TEXT NOT NULL DEFAULT 'local'"),
     ("users", "sso_subject", "TEXT"),
+    ("categories", "default_assignee_id", "INTEGER REFERENCES users(id)"),
+    ("categories", "requires_approval", "INTEGER NOT NULL DEFAULT 0"),
+    ("categories", "approver_id", "INTEGER REFERENCES users(id)"),
 ]
 
 

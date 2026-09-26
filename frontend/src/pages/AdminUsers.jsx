@@ -3,7 +3,18 @@ import { api } from '../api'
 import Modal from '../components/Modal.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
-const BLANK = { username: '', password: '', full_name: '', email: '', role: 'agent', is_admin: false, department: '' }
+// Three user types, one selector -- Admin and Agent are both stored as
+// role='agent' (is_admin true/false); Requester is its own role. Internally
+// still the same two underlying fields the API expects, just never shown
+// as two independently-toggleable controls in this form.
+const BLANK = { username: '', password: '', full_name: '', email: '', userType: 'agent', department: '' }
+
+function userTypeToFields(userType) {
+  return {
+    role: userType === 'requester' ? 'requester' : 'agent',
+    is_admin: userType === 'admin',
+  }
+}
 
 const CSV_TEMPLATE =
   'username,full_name,email,role,department,password,is_admin\n' +
@@ -28,7 +39,8 @@ export default function AdminUsers() {
     e.preventDefault()
     setError('')
     try {
-      await api.post('/users', editing)
+      const { userType, ...rest } = editing
+      await api.post('/users', { ...rest, ...userTypeToFields(userType) })
       setEditing(null)
       load()
     } catch (err) {
@@ -221,18 +233,15 @@ export default function AdminUsers() {
               <div><label className="label">Username</label><input className="input" required value={editing.username} onChange={(e) => setEditing({ ...editing, username: e.target.value })} /></div>
               <div><label className="label">Email</label><input type="email" className="input" required value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} /></div>
               <div><label className="label">Temporary Password</label><input type="text" className="input" required minLength={6} value={editing.password} onChange={(e) => setEditing({ ...editing, password: e.target.value })} /></div>
-              <div><label className="label">Role</label>
-                <select className="input" value={editing.role} onChange={(e) => setEditing({ ...editing, role: e.target.value })}>
-                  <option value="agent">Agent</option>
-                  <option value="requester">Requester</option>
+              <div><label className="label">User Type</label>
+                <select className="input" value={editing.userType} onChange={(e) => setEditing({ ...editing, userType: e.target.value })}>
+                  <option value="admin">Admin — full access, manages users/categories/SLA</option>
+                  <option value="agent">Agent — works tickets, no admin access</option>
+                  <option value="requester">Requester — raises and tracks their own tickets</option>
                 </select>
               </div>
               <div><label className="label">Department</label><input className="input" value={editing.department} onChange={(e) => setEditing({ ...editing, department: e.target.value })} /></div>
             </div>
-            <label className="flex items-center gap-1.5 text-sm text-slate-600">
-              <input type="checkbox" checked={editing.is_admin} onChange={(e) => setEditing({ ...editing, is_admin: e.target.checked })} />
-              Grant admin (manage users, categories, SLA rules)
-            </label>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" className="btn-secondary" onClick={() => setEditing(null)}>Cancel</button>
               <button type="submit" className="btn-primary">Create User</button>

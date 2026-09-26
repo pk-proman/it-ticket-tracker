@@ -228,6 +228,13 @@ export default function TicketDetail() {
           <Field label="Resolved" value={ticket.resolved_at || '—'} />
         </div>
 
+        {ticket.pending_approval && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Awaiting approval from <strong>{ticket.pending_approval.approver_name}</strong> before this can be
+            assigned (requested {ticket.pending_approval.created_at}).
+          </div>
+        )}
+
         {canClose && (
           <div className="mt-4 border-t border-slate-100 pt-4">
             <button className="btn-primary" onClick={() => patch({ status: 'Closed' })}>Close this ticket</button>

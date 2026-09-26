@@ -239,3 +239,50 @@ def send_new_comment_notification(to_email: str, to_name: str, ticket: dict, tic
         f"{_SIGNATURE}"
     )
     send_email(to_email, subject, body, reply_to=reply_to)
+
+
+# ---------------------------------------------------------------------------
+# Category-based approval workflow (see routers/approvals.py)
+# ---------------------------------------------------------------------------
+
+def send_approval_request(approver_email: str, approver_name: str, ticket: dict, ticket_id: int, token: str):
+    """To the designated approver for this ticket's category -- the whole
+    point of the exercise is that they can act on this without logging in."""
+    subject = f"[{ticket['ticket_number']}] Approval needed: {ticket['title']}"
+    link = f"{config.APP_BASE_URL}/api/approvals/{token}"
+    body = (
+        f"Hi {approver_name},\n\n"
+        f"A new {ticket['category']} ticket needs your approval before it can be assigned.\n\n"
+        f"  Ticket: {ticket['ticket_number']} -- {ticket['title']}\n"
+        f"  Requested by: {ticket['requester_name']} ({ticket['requester_email']})\n"
+        f"  Priority: {ticket['priority']}\n\n"
+        f"Review and approve or reject it here (no login needed):\n{link}"
+        f"{_SIGNATURE}"
+    )
+    send_email(approver_email, subject, body)
+
+
+def send_ticket_approved(ticket: dict, ticket_id: int, assignee_name: str):
+    """To the requester, once their ticket clears the approval step."""
+    subject = f"[{ticket['ticket_number']}] Approved: {ticket['title']}"
+    body = (
+        f"Hi {ticket['requester_name']},\n\n"
+        f"Your ticket {ticket['ticket_number']} ({ticket['title']}) has been approved "
+        f"and assigned to {assignee_name}.\n\n"
+        f"Track it here: {ticket_url(ticket_id)}"
+        f"{_SIGNATURE}"
+    )
+    send_email(ticket["requester_email"], subject, body)
+
+
+def send_ticket_rejected(ticket: dict, ticket_id: int):
+    """To the requester, if the approver declines the request."""
+    subject = f"[{ticket['ticket_number']}] Not approved: {ticket['title']}"
+    body = (
+        f"Hi {ticket['requester_name']},\n\n"
+        f"Your ticket {ticket['ticket_number']} ({ticket['title']}) was not approved.\n\n"
+        f"If you have questions about this, please reach out to IT directly.\n\n"
+        f"View it here: {ticket_url(ticket_id)}"
+        f"{_SIGNATURE}"
+    )
+    send_email(ticket["requester_email"], subject, body)

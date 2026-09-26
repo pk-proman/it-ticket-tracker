@@ -480,6 +480,43 @@ self-hosted app like this one).
    Outlook) but email reply parsing has no fully reliable solution, so an
    unusual client's reply may occasionally include some extra quoted text.
 
+### 8c. Category-based default assignment & approvals (optional)
+
+Under **Settings → Categories & ticket routing** (admin only), each category
+can optionally be configured with:
+
+- **Default assignee** — whoever's set here gets the ticket assigned to them
+  automatically the moment it's raised, with that category. Leave unset for
+  "no automatic assignment" (today's default behavior).
+- **Requires approval** — instead of assigning it directly, the ticket stays
+  unassigned and an approval request is emailed to the category's
+  **Approver**. It only gets assigned to the default assignee once they
+  approve it.
+
+The approval email contains a link the approver clicks — **no login
+needed**. Clicking it shows a confirmation page (ticket details, who
+requested it, who it'll be assigned to) with **Approve**/**Reject** buttons;
+nothing is decided until one of those is actually clicked. (This is
+deliberate: some corporate mail systems pre-fetch every link in an email to
+scan it for malware, which would silently approve things before a human ever
+saw the message if the link itself did the approving.)
+
+Once decided:
+- **Approved** → the ticket is assigned to the category's default assignee,
+  and the requester is notified (email + in-app bell, same as any other
+  status change).
+- **Rejected** → the ticket stays unassigned, and the requester is notified
+  it wasn't approved.
+
+Approval links are single-use — visiting one again after it's been decided
+just shows what was already decided, it can't be actioned twice.
+
+Needs email configured (§8a/8b above) — without it, the approval request is
+silently not sent (same "not configured" no-op as every other email in this
+app), so approval-required tickets would sit unassigned with no way for the
+approver to find out. A pending approval also shows directly on the ticket
+page itself either way, for anyone who can view that ticket.
+
 ---
 
 ## 9. Installing on a phone (PWA)

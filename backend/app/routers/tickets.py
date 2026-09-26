@@ -14,6 +14,7 @@ from .. import config, mailer
 from ..database import get_db
 from ..deps import get_current_user, require_agent, require_admin
 from ..utils import compute_sla_due, log_audit, next_ticket_number, notify_user, rows_to_list, serialize_ticket_row
+from .approvals import create_approval
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 
@@ -265,14 +266,36 @@ def create_ticket(payload: CreateTicketRequest, conn: sqlite3.Connection = Depen
     # Confirmation email to the requester -- always has an email on file
     # (their own account, or whatever an agent typed in for a walk-up), even
     # when there's no in-app account to put a bell notification on.
+    ticket_email_data = {
+        "ticket_number": ticket_number, "title": payload.title.strip(), "category": payload.category,
+        "priority": payload.priority, "requester_name": requester_name, "requester_email": requester_email,
+    }
     if config.EMAIL_ENABLED:
-        mailer.send_ticket_created_confirmation(
-            {
-                "ticket_number": ticket_number, "title": payload.title.strip(), "category": payload.category,
-                "priority": payload.priority, "requester_name": requester_name, "requester_email": requester_email,
-            },
-            ticket_id,
-        )
+        mailer.send_ticket_created_confirmation(ticket_email_data, ticket_id)
+
+    # Category-based workflow (configured per category under Settings): some
+    # categories (e.g. "ERPNext") route to an approver before being assigned
+    # at all; others just default-assign straight to whoever's configured.
+    category_row = conn.execute(
+        "SELECT default_assignee_id, requires_approval, approver_id FROM categories WHERE name = ?",
+        (payload.category,),
+    ).fetchone()
+    if category_row and category_row["requires_approval"] and category_row["approver_id"]:
+        approver = conn.execute(
+            "SELECT full_name, email FROM users WHERE id = ?", (category_row["approver_id"],)
+        ).fetchone()
+        if approver and approver["email"]:
+            token = create_approval(conn, ticket_id, category_row["approver_id"], category_row["default_assignee_id"])
+            if config.EMAIL_ENABLED:
+                mailer.send_approval_request(approver["email"], approver["full_name"], ticket_email_data, ticket_id, token)
+    elif category_row and category_row["default_assignee_id"]:
+        assignee = conn.execute(
+            "SELECT full_name FROM users WHERE id = ? AND role = 'agent' AND active = 1",
+            (category_row["default_assignee_id"],),
+        ).fetchone()
+        if assignee:
+            conn.execute("UPDATE tickets SET assignee_id = ? WHERE id = ?", (category_row["default_assignee_id"], ticket_id))
+            log_audit(conn, ticket_id, "assignee", "Unassigned", assignee["full_name"], "System (category default)")
 
     row = _ticket_or_404(conn, ticket_id)
     return _serialize_ticket(row)
@@ -289,6 +312,17 @@ def get_ticket(ticket_id: int, conn: sqlite3.Connection = Depends(get_db), user=
         d["assignee_name"] = assignee["full_name"] if assignee else None
     else:
         d["assignee_name"] = None
+
+    pending_approval = conn.execute(
+        """SELECT ta.*, u.full_name AS approver_name FROM ticket_approvals ta
+           JOIN users u ON u.id = ta.approver_id
+           WHERE ta.ticket_id = ? AND ta.status = 'pending'""",
+        (ticket_id,),
+    ).fetchone()
+    d["pending_approval"] = (
+        {"approver_name": pending_approval["approver_name"], "created_at": pending_approval["created_at"]}
+        if pending_approval else None
+    )
 
     linked_assets = conn.execute(
         """SELECT a.* FROM assets a JOIN ticket_assets ta ON ta.asset_id = a.id WHERE ta.ticket_id = ?""",
