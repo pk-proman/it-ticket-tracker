@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.6.0 — Self-hosted VPS deployment (Hostinger or any Ubuntu/Debian box)
+
+### Added
+- `docker-compose.yml` — runs the existing `Dockerfile` (unchanged, still
+  used by Railway too) with a persistent `./data` volume and the app bound
+  to `127.0.0.1:8000` only, for fronting with a reverse proxy.
+- `deploy/vps-setup.sh` — one-shot, idempotent setup script: installs
+  Docker + Caddy if missing, clones/pulls the repo, generates a fresh `.env`
+  with a random `SESSION_SECRET` on first run (never overwrites an existing
+  one), builds and starts the app, and wires up Caddy for the given domain
+  with fully automatic TLS (no certbot/cron). Re-running the same script is
+  also how you deploy every future update. Doesn't touch any other site's
+  Caddy config already on the same box.
+- `deploy/Caddyfile.template` — the per-site reverse-proxy config the setup
+  script fills in and installs.
+- README §5d covers the full walkthrough end to end.
+
+---
+
 ## v1.5.0 — Installable as a PWA
 
 ### Added

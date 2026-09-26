@@ -1,0 +1,24 @@
+# For self-hosted deployment (Hostinger or any VPS/server with Docker). Not
+# used by Railway, which builds straight from the Dockerfile instead. See
+# README.md #5d for the full setup walkthrough.
+#
+# Usage:
+#   cp .env.example .env   # then fill in SESSION_SECRET etc.
+#   docker compose up -d --build
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Docker Compose's env_file doesn't expand a default like the app's own
+      # config.py does, so pin it explicitly here to match the Dockerfile.
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    ports:
+      # Bind only to localhost -- Caddy (or nginx) fronts this with TLS on
+      # 80/443; the app itself is never directly reachable from the internet.
+      - "127.0.0.1:8000:8000"

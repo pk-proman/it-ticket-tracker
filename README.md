@@ -249,6 +249,66 @@ no duplicate is created.
 
 ---
 
+## 5d. Deploying to your own VPS (e.g. Hostinger)
+
+This gets you from a fresh VPS to the app running at your own domain over
+HTTPS, using Docker (the same `Dockerfile` Railway builds from) plus
+[Caddy](https://caddyserver.com) as the reverse proxy — Caddy issues and
+renews its own free TLS certificate automatically, no certbot/cron needed.
+(For a bare-metal setup with no Docker at all, see §5b instead — that covers
+running `run.py` as a background service directly, but without the
+reverse-proxy/TLS piece this section adds.)
+
+**Prerequisites:**
+- A VPS running Ubuntu or Debian (Hostinger's default templates), with root
+  SSH access.
+- A domain or subdomain with its DNS **A record** pointed at the VPS's public
+  IP address (do this first — Caddy can't issue a certificate until it
+  resolves).
+- This repo pushed to GitHub (see the earlier steps in this conversation, or
+  any `git remote add` + `git push`). If the repo is private, either set up a
+  deploy key beforehand or have a GitHub Personal Access Token ready — cloning
+  will prompt for it.
+
+**Steps**, run on the VPS itself (SSH in first — this can't be done from your
+laptop):
+
+```bash
+ssh root@your-vps-ip
+
+curl -o vps-setup.sh https://raw.githubusercontent.com/YOUR_USERNAME/it-ticket-tracker/main/deploy/vps-setup.sh
+chmod +x vps-setup.sh
+./vps-setup.sh --domain support.yourdomain.com --repo https://github.com/YOUR_USERNAME/it-ticket-tracker.git
+```
+
+(If the repo is private, `curl` above can't fetch the raw script — instead
+clone the repo first with your usual git credentials, then run
+`./deploy/vps-setup.sh` from inside it.)
+
+The script:
+1. Installs Docker, if it isn't already.
+2. Installs Caddy, if it isn't already (won't touch any other sites already
+   configured on the box).
+3. Clones the repo to `/opt/it-ticket-tracker` (or pulls the latest if it's
+   already there — **this is also how you deploy every future update**: just
+   re-run the same script, or `cd /opt/it-ticket-tracker && git pull &&
+   docker compose up -d --build`).
+4. Writes a `.env` with a freshly generated `SESSION_SECRET`, prompting you
+   once for the initial admin password. Only happens on the very first run —
+   review/edit `.env` any time after for SMTP, SSO, SLA hours, etc.
+5. Builds and starts the app container (bound to `127.0.0.1:8000` only —
+   never directly internet-facing).
+6. Points Caddy at it for your domain and reloads it.
+
+Once DNS has propagated, `https://support.yourdomain.com` is live, with a
+real trusted certificate and no manual TLS setup. Log in as `admin` with the
+password you set, then change it immediately (see §3).
+
+**Backups** work exactly as described in §4 — everything is under
+`/opt/it-ticket-tracker/data` on the VPS now instead of a Railway volume.
+
+---
+
 ## 6. Resetting an admin password
 
 If you're locked out, reset any user's password from the command line (no need for
