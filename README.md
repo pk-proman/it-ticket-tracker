@@ -508,6 +508,16 @@ Once decided:
 - **Rejected** → the ticket stays unassigned, and the requester is notified
   it wasn't approved.
 
+**Urgent override:** with "Requires approval" on, a second checkbox appears —
+*Critical tickets skip approval and go straight to the default assignee*.
+With that on, a ticket raised in that category at **Critical** priority is
+assigned immediately (the audit trail records it as "System (Critical
+priority, approval skipped)") and no approval request is sent; every other
+priority still goes through the approver as normal. It needs a default
+assignee to be set. Note this applies at the moment the ticket is created —
+raising a pending ticket's priority to Critical afterward doesn't
+retroactively skip an approval that's already waiting.
+
 Approval links are single-use — visiting one again after it's been decided
 just shows what was already decided, it can't be actioned twice.
 

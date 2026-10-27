@@ -36,6 +36,9 @@ class CategoryConfigRequest(BaseModel):
     default_assignee_id: int | None = None
     requires_approval: bool = False
     approver_id: int | None = None
+    # When on, Critical-priority tickets in this category skip the approval
+    # step and go straight to the default assignee.
+    critical_skips_approval: bool = False
 
 
 @router.post("/categories")
@@ -70,9 +73,14 @@ def update_category_config(
         raise HTTPException(status_code=400, detail="An approver is required when requires_approval is on")
     _require_agent_or_none(conn, payload.approver_id, "approver_id")
 
+    if payload.critical_skips_approval and not payload.default_assignee_id:
+        raise HTTPException(status_code=400, detail="A default assignee is required for Critical tickets to skip approval")
+
     conn.execute(
-        "UPDATE categories SET default_assignee_id = ?, requires_approval = ?, approver_id = ? WHERE id = ?",
-        (payload.default_assignee_id, int(payload.requires_approval), payload.approver_id, category_id),
+        """UPDATE categories SET default_assignee_id = ?, requires_approval = ?, approver_id = ?,
+           critical_skips_approval = ? WHERE id = ?""",
+        (payload.default_assignee_id, int(payload.requires_approval), payload.approver_id,
+         int(payload.critical_skips_approval), category_id),
     )
     return dict(conn.execute(f"{_CATEGORY_SELECT} WHERE c.id = ?", (category_id,)).fetchone())
 

@@ -277,10 +277,23 @@ def create_ticket(payload: CreateTicketRequest, conn: sqlite3.Connection = Depen
     # categories (e.g. "ERPNext") route to an approver before being assigned
     # at all; others just default-assign straight to whoever's configured.
     category_row = conn.execute(
-        "SELECT default_assignee_id, requires_approval, approver_id FROM categories WHERE name = ?",
+        """SELECT default_assignee_id, requires_approval, approver_id, critical_skips_approval
+           FROM categories WHERE name = ?""",
         (payload.category,),
     ).fetchone()
-    if category_row and category_row["requires_approval"] and category_row["approver_id"]:
+
+    # Urgent override: a Critical ticket in a category configured with
+    # "Critical skips approval" goes straight to the default assignee instead
+    # of waiting on the approver.
+    skip_approval = bool(
+        category_row
+        and category_row["requires_approval"]
+        and category_row["critical_skips_approval"]
+        and category_row["default_assignee_id"]
+        and payload.priority == "Critical"
+    )
+
+    if category_row and category_row["requires_approval"] and category_row["approver_id"] and not skip_approval:
         approver = conn.execute(
             "SELECT full_name, email FROM users WHERE id = ?", (category_row["approver_id"],)
         ).fetchone()
@@ -295,7 +308,10 @@ def create_ticket(payload: CreateTicketRequest, conn: sqlite3.Connection = Depen
         ).fetchone()
         if assignee:
             conn.execute("UPDATE tickets SET assignee_id = ? WHERE id = ?", (category_row["default_assignee_id"], ticket_id))
-            log_audit(conn, ticket_id, "assignee", "Unassigned", assignee["full_name"], "System (category default)")
+            log_audit(
+                conn, ticket_id, "assignee", "Unassigned", assignee["full_name"],
+                "System (Critical priority, approval skipped)" if skip_approval else "System (category default)",
+            )
 
     row = _ticket_or_404(conn, ticket_id)
     return _serialize_ticket(row)

@@ -21,6 +21,7 @@ export default function AdminSettings() {
           default_assignee_id: c.default_assignee_id ?? '',
           requires_approval: Boolean(c.requires_approval),
           approver_id: c.approver_id ?? '',
+          critical_skips_approval: Boolean(c.critical_skips_approval),
         }
       })
       setConfigs(next)
@@ -68,6 +69,9 @@ export default function AdminSettings() {
         default_assignee_id: cfg.default_assignee_id ? Number(cfg.default_assignee_id) : null,
         requires_approval: cfg.requires_approval,
         approver_id: cfg.approver_id ? Number(cfg.approver_id) : null,
+        // Only meaningful with approval on; send false otherwise so turning
+        // approval off never leaves a stale "skip" flag behind.
+        critical_skips_approval: Boolean(cfg.requires_approval && cfg.critical_skips_approval),
       })
       setSavedId(id)
       setTimeout(() => setSavedId(null), 1500)
@@ -154,6 +158,16 @@ export default function AdminSettings() {
                     </div>
                   )}
                 </div>
+                {cfg.requires_approval && (
+                  <label className="mt-2 flex items-center gap-1.5 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={cfg.critical_skips_approval || false}
+                      onChange={(e) => setConfig(c.id, { critical_skips_approval: e.target.checked })}
+                    />
+                    Critical tickets skip approval and go straight to the default assignee
+                  </label>
+                )}
                 <div className="mt-2 flex items-center gap-2">
                   <button className="btn-secondary text-xs" onClick={() => saveConfig(c.id)}>Save</button>
                   {savedId === c.id && <span className="text-xs text-emerald-600">Saved</span>}

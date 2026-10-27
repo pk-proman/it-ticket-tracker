@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.8.1 — Critical tickets can skip approval
+
+### Added
+- New per-category setting, "Critical tickets skip approval and go straight
+  to the default assignee" (Settings, shown when "Requires approval" is on).
+  A Critical-priority ticket in such a category is assigned immediately at
+  creation — no approval request is sent — and the audit trail records why.
+  Other priorities in the same category still go through the approver.
+  Configurable per category rather than hardcoded to ERPNext.
+- `categories.critical_skips_approval` column via the existing additive
+  migration (verified against a database created before this column
+  existed: data preserved, flag defaults off, safe to run repeatedly), so
+  nothing changes for any category until an admin turns it on.
+
 ## v1.8.0 — Category-based routing, approval workflow, simplified user creation
 
 ### Added

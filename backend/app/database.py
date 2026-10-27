@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS categories (
     name TEXT UNIQUE NOT NULL,
     default_assignee_id INTEGER REFERENCES users(id),
     requires_approval INTEGER NOT NULL DEFAULT 0,
-    approver_id INTEGER REFERENCES users(id)
+    approver_id INTEGER REFERENCES users(id),
+    critical_skips_approval INTEGER NOT NULL DEFAULT 0
 );
 
 -- One row per ticket that needed approval before assignment (see the
@@ -196,6 +197,7 @@ _MIGRATIONS = [
     ("categories", "default_assignee_id", "INTEGER REFERENCES users(id)"),
     ("categories", "requires_approval", "INTEGER NOT NULL DEFAULT 0"),
     ("categories", "approver_id", "INTEGER REFERENCES users(id)"),
+    ("categories", "critical_skips_approval", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
