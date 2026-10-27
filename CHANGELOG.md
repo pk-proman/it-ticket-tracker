@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.2 — Licenses shown in rupees
+
+### Changed
+- The Licenses page now shows and labels cost in ₹ instead of $ (list column
+  and the "Cost (₹/yr)" field), with Indian digit grouping (e.g. ₹1,50,000).
+  Display only — stored values are unchanged, so no data migration.
+
 ## v1.8.1 — Critical tickets can skip approval
 
 ### Added

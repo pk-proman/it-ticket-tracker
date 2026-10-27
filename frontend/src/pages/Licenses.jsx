@@ -72,7 +72,7 @@ export default function Licenses() {
                 <td className="px-3 py-2 text-slate-500">{l.vendor || '—'}</td>
                 <td className="px-3 py-2 text-slate-500">{l.seats_in_use}/{l.total_seats}</td>
                 <td className={`px-3 py-2 ${expiryTone(l.renewal_date)}`}>{l.renewal_date || '—'}</td>
-                <td className="px-3 py-2 text-slate-500">{l.cost ? `$${Number(l.cost).toLocaleString()}` : '—'}</td>
+                <td className="px-3 py-2 text-slate-500">{l.cost ? `₹${Number(l.cost).toLocaleString('en-IN')}` : '—'}</td>
                 <td className="px-3 py-2 text-slate-500">{l.owner || '—'}</td>
                 <td className="px-3 py-2 text-right">
                   <button className="mr-3 text-xs text-brand-600 hover:underline" onClick={() => setEditing({ ...l })}>Edit</button>
@@ -96,7 +96,7 @@ export default function Licenses() {
               <div><label className="label">Total Seats</label><input type="number" min="0" className="input" value={editing.total_seats} onChange={(e) => setEditing({ ...editing, total_seats: Number(e.target.value) })} /></div>
               <div><label className="label">Seats In Use</label><input type="number" min="0" className="input" value={editing.seats_in_use} onChange={(e) => setEditing({ ...editing, seats_in_use: Number(e.target.value) })} /></div>
               <div><label className="label">Renewal Date</label><input type="date" className="input" value={editing.renewal_date || ''} onChange={(e) => setEditing({ ...editing, renewal_date: e.target.value })} /></div>
-              <div><label className="label">Cost ($/yr)</label><input type="number" step="0.01" min="0" className="input" value={editing.cost} onChange={(e) => setEditing({ ...editing, cost: Number(e.target.value) })} /></div>
+              <div><label className="label">Cost (₹/yr)</label><input type="number" step="0.01" min="0" className="input" value={editing.cost} onChange={(e) => setEditing({ ...editing, cost: Number(e.target.value) })} /></div>
             </div>
             <div><label className="label">Owner</label><input className="input" value={editing.owner} onChange={(e) => setEditing({ ...editing, owner: e.target.value })} /></div>
             <div className="flex justify-end gap-2 pt-2">
